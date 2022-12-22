@@ -6,6 +6,8 @@ import torch_geometric.transforms as T
 import sys
 import time
 
+import numpy as np
+
 sys.path.append('..')
 
 from Retinotopy.dataset.HCP_3sets_ROI import Retinotopy
@@ -13,16 +15,42 @@ from torch_geometric.data import DataLoader
 from torch_geometric.nn import SplineConv
 
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'Retinotopy', 'data')
+# path = 'whateverthedirectoryishere/explainability_CorticalSurfaceGDL/Retinotopy/data/'
 norm_value = 70.4237
 pre_transform = T.Compose([T.FaceToEdge()])
 
 train_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
-                           pre_transform=pre_transform, n_examples=181,
+                            pre_transform=pre_transform, n_examples=181,
+                           prediction='polarAngle', myelination=False,
+                           hemisphere='Left') # Change to Right for the RH
+
+# #### Check that the train dataset is using the new curvature data ####
+prev_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
+                            pre_transform=pre_transform, n_examples=181,
                            prediction='polarAngle', myelination=True,
                            hemisphere='Left') # Change to Right for the RH
+print(f'New data (1st subject): {train_dataset[0].x}; Shape of \'x\' data: {np.shape(train_dataset[0].x)}')
+print(f'Old data (1st subject): {prev_dataset[0].x}; Shape of \'x\' data: {np.shape(prev_dataset[0].x)}')
+
+if np.shape(train_dataset[0].x)[1] == np.shape(prev_dataset[0].x)[1]:
+    raise Exception('The new dataset has the same shape as the old dataset, which also loads myelination data.' +
+    ' Make sure myelination=False in train_dataset variable.')
+elif any(train_dataset[0].x[0] == train_dataset[i].x[0] for i in range(0, len(prev_dataset))):
+    raise Exception('First subject in new dataset has identical curvature values to a subject in the old' +
+    ' dataset. Check that the new curvature data is being loaded in train_dataset.')
+else:
+    print('Passed cursory subject data check')
+
+#### This was for checking correlations between the old and new datasets, please ignore ####
+
+# train_curv = [train_dataset[i].x for i in range(0, len(train_dataset))]
+# prev_curv = [torch.transpose(prev_dataset[i].x, 0, 1)[0] for i in range(0, len(prev_dataset))]
+# correlation =  np.corrcoef(train_curv[0].T, prev_curv[0])
+# np.corrcoef(train_dataset[0].x.T,prev_dataset[0].x.T[0].T)
+
 dev_dataset = Retinotopy(path, 'Development', transform=T.Cartesian(max_value=norm_value),
                          pre_transform=pre_transform, n_examples=181,
-                         prediction='polarAngle', myelination=True,
+                         prediction='polarAngle', myelination=False,
                          hemisphere='Left') # Change to Right for the RH
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
@@ -31,7 +59,8 @@ dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
 class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = SplineConv(2, 8, dim=3, kernel_size=25)
+        # No. of feature maps is 1 if only using curvature data (2 feature maps if myelination=True)
+        self.conv1 = SplineConv(1, 8, dim=3, kernel_size=25)
         self.bn1 = torch.nn.BatchNorm1d(8)
 
         self.conv2 = SplineConv(8, 16, dim=3, kernel_size=25)
@@ -183,7 +212,7 @@ def test():
     return output
 
 
-# init = time.time() # To find out how long it takes to train the model
+init = time.time() # To find out how long it takes to train the model
 
 # Create an output folder if it doesn't already exist
 directory = './output'
@@ -215,6 +244,6 @@ for i in range(5):
                osp.join(osp.dirname(osp.realpath(__file__)), 'output',
                         'deepRetinotopy_PA_LH_model' + str(i+1) + '.pt')) # Rename if RH
 
-# end = time.time() # To find out how long it takes to train the model
-# time = (end - init) / 60
-# print(str(time) + ' minutes')
+end = time.time() # To find out how long it takes to train the model
+time = (end - init) / 60
+print(str(time) + ' minutes')
