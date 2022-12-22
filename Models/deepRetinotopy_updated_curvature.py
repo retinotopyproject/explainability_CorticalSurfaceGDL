@@ -35,8 +35,8 @@ print(f'Old data (1st subject): {prev_dataset[0].x}; Shape of \'x\' data: {np.sh
 if np.shape(train_dataset[0].x)[1] == np.shape(prev_dataset[0].x)[1]:
     raise Exception('The new dataset has the same shape as the old dataset, which also loads myelination data.' +
     ' Make sure myelination=False in train_dataset variable.')
-elif any(train_dataset[0].x[0] == train_dataset[i].x[0] for i in range(0, len(prev_dataset))):
-    raise Exception('First subject in new dataset has identical curvature values to a subject in the old' +
+elif any(torch.equal(train_dataset[i].x[0], prev_dataset[i].x[0]) for i in range(0, len(prev_dataset))):
+    raise Exception('A subject in new dataset has identical curvature values to a subject in the old' +
     ' dataset. Check that the new curvature data is being loaded in train_dataset.')
 else:
     print('Passed cursory subject data check')
