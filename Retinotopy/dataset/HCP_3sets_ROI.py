@@ -62,23 +62,23 @@ class Retinotopy(InMemoryDataset):
                 else:
                     return [
                         'training_pRFsize_LH_myelincurv_ROI.pt',
-                        'development_pRFsize__LH_myelincurv_ROI.pt',
+                        'development_pRFsize_LH_myelincurv_ROI.pt',
                         'test_pRFsize_LH_myelincurv_ROI.pt']
             else:
                 if self.prediction == 'eccentricity':
-                    return ['training_ecc_LH_ROI.pt',
-                            'development_ecc_LH_ROI.pt',
-                            'test_ecc_LH_ROI.pt']
+                    return ['training_ecc_LH_curv_ROI.pt',
+                            'development_ecc_LH_curv_ROI.pt',
+                            'test_ecc_LH_curv_ROI.pt']
 
                 elif self.prediction == 'polarAngle':
-                    return ['training_PA_LH_ROI.pt',
-                            'development_PA_LH_ROI.pt',
-                            'test_PA_LH_ROI.pt']
+                    return ['training_PA_LH_curv_ROI.pt',
+                            'development_PA_LH_curv_ROI.pt',
+                            'test_PA_LH_curv_ROI.pt']
                 else:
                     return [
-                        'training_pRFsize_LH_ROI.pt',
-                        'development_pRFsize_LH_ROI.pt',
-                        'test_pRFsize_LH_ROI.pt']
+                        'training_pRFsize_LH_curv_ROI.pt',
+                        'development_pRFsize_LH_curv_ROI.pt',
+                        'test_pRFsize_LH_curv_ROI.pt']
 
         else:
             if self.myelination == True:
@@ -101,20 +101,20 @@ class Retinotopy(InMemoryDataset):
                         'test_pRFsize_RH_myelincurv_ROI.pt']
             else:
                 if self.prediction == 'eccentricity':
-                    return ['training_ecc_RH_ROI.pt',
-                            'development_ecc_RH_ROI.pt',
-                            'test_ecc_RH_ROI.pt']
+                    return ['training_ecc_RH_curv_ROI.pt',
+                            'development_ecc_RH_curv_ROI.pt',
+                            'test_ecc_RH_curv_ROI.pt']
 
                 elif self.prediction == 'polarAngle':
-                    return ['training_PA_RH_ROI.pt',
-                            'development_PA_RH_ROI.pt',
-                            'test_PA_RH_ROI.pt']
+                    return ['training_PA_RH_curv_ROI.pt',
+                            'development_PA_RH_curv_ROI.pt',
+                            'test_PA_RH_curv_ROI.pt']
 
                 else:
                     return [
-                        'training_pRFsize_RH_ROI.pt',
-                        'development_pRFsize_RH_ROI.pt',
-                        'test_pRFsize_RH_ROI.pt']
+                        'training_pRFsize_RH_curv_ROI.pt',
+                        'development_pRFsize_RH_curv_ROI.pt',
+                        'test_pRFsize_RH_curv_ROI.pt']
 
     # def download(self):
     #     raise RuntimeError(
