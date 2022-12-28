@@ -24,7 +24,7 @@ train_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_v
                            prediction='polarAngle', myelination=False,
                            hemisphere='Left') # Change to Right for the RH
 
-# #### Check that the train dataset is using the new curvature data ####
+# #### Check that the train dataset is using the new curvature data (checking 1st subject only) ####
 prev_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
                             pre_transform=pre_transform, n_examples=181,
                            prediction='polarAngle', myelination=True,
@@ -35,8 +35,8 @@ print(f'Old data (1st subject): {prev_dataset[0].x}; Shape of \'x\' data: {np.sh
 if np.shape(train_dataset[0].x)[1] == np.shape(prev_dataset[0].x)[1]:
     raise Exception('The new dataset has the same shape as the old dataset, which also loads myelination data.' +
     ' Make sure myelination=False in train_dataset variable.')
-elif any(torch.equal(train_dataset[i].x[0], prev_dataset[i].x[0]) for i in range(0, len(prev_dataset))):
-    raise Exception('A subject in new dataset has identical curvature values to a subject in the old' +
+elif any(torch.equal(train_dataset[0].x[0], prev_dataset[i].x[0]) for i in range(0, len(prev_dataset))):
+    raise Exception('First subject in new dataset has identical curvature values to a subject in the old' +
     ' dataset. Check that the new curvature data is being loaded in train_dataset.')
 else:
     print('Passed cursory subject data check')

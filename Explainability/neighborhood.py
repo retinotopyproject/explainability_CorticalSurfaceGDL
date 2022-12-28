@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 
-def node_neighbourhood(data, node, neighborhood_size):
+def node_neighbourhood(data, node, neighborhood_size, myelination=True):
     """Function to occlude input features that fall within a specific node's
     neighbourhood.
 
@@ -13,12 +13,22 @@ def node_neighbourhood(data, node, neighborhood_size):
 
         neighboorhood_size (int): Neighboorhood size for occlusion experiments
 
+        myelination (boolean): If true, then myelination data is observed.
+        If false, then only curvature data is observed.
+
     Returns:
         data (pytorch data object): Data object of a single individual with
             occluded features in the given node's neighborhood
 
         neighbours (dictionary): Dictionary with neighbouring nodes' indices
     """
+
+    if myelination:
+        constant = torch.tensor([0.027303819, 1.4386905])
+    else:
+        # Observing only curvature data:
+        constant = torch.tensor([0.027303819])
+
 
     if neighborhood_size == 1:
         neighbor_nodes = data.edge_index[1][
@@ -28,8 +38,7 @@ def node_neighbourhood(data, node, neighborhood_size):
 
         # constant
         data.x[neighbors['level_1']] = torch.ones(
-            data.x[neighbors['level_1']].shape) * torch.tensor(
-            [0.027303819, 1.4386905])
+            data.x[neighbors['level_1']].shape) * constant
 
     else:
         neighbor_nodes = data.edge_index[1][
@@ -52,8 +61,7 @@ def node_neighbourhood(data, node, neighborhood_size):
         # constant
         data.x[neighbors['level_' + str(neighborhood_size)]] = torch.ones(
             data.x[neighbors[
-                'level_' + str(neighborhood_size)]].shape) * torch.tensor(
-            [0.027303819, 1.4386905])
+                'level_' + str(neighborhood_size)]].shape) * constant
     return data, neighbors
 
 
