@@ -132,7 +132,12 @@ for i in range(5):
             map_location=device))
 
     # Create an output folder if it doesn't already exist
-    directory = './devset_results'
+    # directory = './devset_results'
+    # if not osp.exists(directory):
+    #     os.makedirs(directory)
+
+    # Creating output folder for testset results
+    directory = './testset_results'
     if not osp.exists(directory):
         os.makedirs(directory)
 
@@ -142,13 +147,25 @@ for i in range(5):
         MeanAbsError = 0
         y = []
         y_hat = []
-        for data in dev_loader:
+        # For dev set:
+        # for data in dev_loader:
+        #     pred = model(data.to(device)).detach()
+        #     y_hat.append(pred)
+        #     y.append(data.to(device).y.view(-1))
+        #     MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
+        #     MeanAbsError += MAE
+        # test_MAE = MeanAbsError / len(dev_loader)
+        
+        # For test set:
+        # make sure folder name is changed and file names (change to test_loader)
+        for data in test_loader:
             pred = model(data.to(device)).detach()
             y_hat.append(pred)
             y.append(data.to(device).y.view(-1))
             MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
             MeanAbsError += MAE
-        test_MAE = MeanAbsError / len(dev_loader)
+        test_MAE = MeanAbsError / len(test_loader)
+
         output = {'Predicted_values': y_hat, 'Measured_values': y,
                   'MAE': test_MAE}
         return output
@@ -156,9 +173,18 @@ for i in range(5):
 
     evaluation = test()
 
+    # For dev set:
+    # torch.save({'Predicted_values': evaluation['Predicted_values'],
+    #             'Measured_values': evaluation['Measured_values']},
+    #            osp.join(osp.dirname(osp.realpath(__file__)),
+    #                     'devset_results',
+    #                     'devset-intactData_model' + str(
+    #                         i + 1) + '.pt'))
+
+    # For test set:
     torch.save({'Predicted_values': evaluation['Predicted_values'],
-                'Measured_values': evaluation['Measured_values']},
-               osp.join(osp.dirname(osp.realpath(__file__)),
-                        'devset_results',
-                        'devset-intactData_model' + str(
-                            i + 1) + '.pt'))
+            'Measured_values': evaluation['Measured_values']},
+            osp.join(osp.dirname(osp.realpath(__file__)),
+                    'testset_results',
+                    'testset-intactData_model' + str(
+                        i + 1) + '.pt'))
