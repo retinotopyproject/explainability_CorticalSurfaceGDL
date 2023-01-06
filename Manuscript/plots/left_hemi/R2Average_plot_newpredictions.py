@@ -1,0 +1,139 @@
+import os.path as osp
+import scipy.io
+import sys
+import torch_geometric.transforms as T
+import numpy as np
+
+# For reading new curvature data
+import nibabel as nib
+import torch
+
+sys.path.append('../..')
+
+from Retinotopy.functions.def_ROIs_WangParcelsPlusFovea import roi
+from nilearn import plotting
+from Retinotopy.dataset.HCP_3sets_ROI import Retinotopy
+from torch_geometric.data import DataLoader
+
+# cd Manuscript/plots
+path = './../../Retinotopy/data/raw/converted'
+
+# cd Manuscript/plots/left_hemi
+# path = './../../../Retinotopy/data/raw/converted'
+
+# For new curvature data:
+# Loading subject IDs
+with open(osp.join(path, '../..', 'list_subj')) as fp:
+    subjects = fp.read().split("\n")
+subjects = subjects[0:len(subjects) - 1]
+# Defining number of nodes
+number_cortical_nodes = int(64984)
+number_hemi_nodes = int(number_cortical_nodes / 2)
+
+# Reading all data
+curv = []
+for index in range(0, len(subjects)):
+    # Reading new curvature data (Left hemi)
+    data = nib.load(osp.join(path, '../..', f'raw/converted/fs-curvature/{subjects[index]}/', \
+        subjects[index] + '.L.curvature.32k_fs_LR.shape.gii'))
+    data = torch.tensor(np.reshape(data.agg_data().reshape((number_hemi_nodes)), 
+        (-1, 1)), dtype=torch.float)
+    # # Filter out NaNs
+    # data = data.masked_fill_(torch.tensor(np.reshape(torch.any(data.isnan(), dim=1).reshape((number_hemi_nodes)),
+    #     (-1, 1))), 0)
+    # # data = data[~torch.any(data.isnan())]
+    curv.append(data)
+background = np.zeros((number_hemi_nodes, 1))
+
+# Background settings
+# threshold = 1
+threshold = 0
+nocurv = np.isnan(background)
+background[nocurv == 1] = 0
+
+# New curvature background settings
+nocurv = np.isnan(background)
+background[nocurv == 1] = 0
+
+# ROI settings
+label_primary_visual_areas = ['ROI']
+final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
+    label_primary_visual_areas)
+# print(np.sum(final_mask_L==1))
+R2_thr = np.zeros((32492, 1))
+# For new curvature
+R2_thr_new = np.zeros((32492, 1))
+
+# Loading data - left hemisphere
+# path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 'Retinotopy/data')
+# pre_transform = T.Compose([T.FaceToEdge()])
+# test_dataset = Retinotopy(path, 'Test', transform=T.Cartesian(),
+#                            pre_transform=pre_transform, n_examples=181,
+#                            prediction='polarAngle', myelination=True,
+#                            hemisphere='Left')
+# test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+
+# Loading old data (left hemisphere) without visual mask applied
+test_loader = DataLoader(curv_old, batch_size=1, shuffle=True)
+
+# Creating dataset for new curvature = left hemisphere
+test_loader_new = DataLoader(curv_new, batch_size=1, shuffle=True)
+
+# # Average explained variance map
+# R2 = []
+# for data in test_loader:
+#     R2.append(np.array(data.R2))
+# R2 = np.mean(R2, 0)
+
+# # New curvature - Average explained variance map
+# R2_new = []
+# for new_data in test_loader_new:
+#     R2_new.append(np.array(new_data.R2))
+# R2_new = np.mean(R2_new, 0)
+
+# # Masking
+# R2_thr[final_mask_L == 1] = np.reshape(R2, (-1, 1)) + threshold
+# R2_thr[final_mask_L != 1] = 0
+
+# Masking
+R2_thr[final_mask_L == 1] = (np.reshape(np.asarray(curv_old[0][final_mask_L == 1]), (-1, 1)) + 10) * 20
+R2_thr[final_mask_L != 1] = 0
+
+# New curvature - Masking
+R2_thr_new[final_mask_L == 1] = (np.reshape(np.asarray(curv_new[0][final_mask_L == 1]), (-1, 1)) + 10) * 20
+R2_thr_new[final_mask_L != 1] = 0
+
+
+# view = plotting.view_surf(
+#     surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+#                        'Retinotopy/data/raw/surfaces'
+#                        '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
+#     bg_map=background, surf_map=np.reshape(R2_thr[0:32492], (-1)),
+#     threshold=threshold, cmap='hot', black_bg=False, symmetric_cmap=False,
+#     vmax=60 + threshold)
+# view.open_in_browser()
+
+# print(min([R2_thr[i][0] for i in range(0, len(R2_thr)) if R2_thr[i][0] > 0]))
+# print(min([R2_thr_new[i][0] for i in range(0, len(R2_thr_new)) if R2_thr_new[i][0] > 0]))
+print(np.mean(R2_thr))
+print(np.mean(R2_thr_new))
+# correlation = np.corrcoef(R2_thr[final_mask_L == 1].flatten(), R2_thr_new[final_mask_L == 1].flatten())
+# print(correlation)
+
+# surf_map should be loading the curvature!
+view = plotting.view_surf(
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+                       'Retinotopy/data/raw/surfaces'
+                       '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
+    bg_map=background, surf_map=np.reshape(R2_thr[0:32492], (-1)), 
+    cmap='plasma', black_bg=False, vmin=190, symmetric_cmap=False)
+view.open_in_browser()
+
+# For new curvature - view
+view_new = plotting.view_surf(
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+                       'Retinotopy/data/raw/surfaces'
+                       '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
+    bg_map=background_new, surf_map=np.reshape(R2_thr_new[0:32492], (-1)),
+    cmap='plasma', black_bg=False, vmin=190, symmetric_cmap=False)
+view_new.open_in_browser()

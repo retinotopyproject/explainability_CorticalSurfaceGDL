@@ -8,7 +8,6 @@ from Retinotopy.functions.def_ROIs_DorsalEarlyVisualCortex import roi as roi2
 from nilearn import plotting
 
 
-#### TODO Comment out any references to kernel ####
 
 # For loading new curvature data
 import nibabel as nib
@@ -38,9 +37,7 @@ number_cortical_nodes = int(64984)
 number_hemi_nodes = int(number_cortical_nodes / 2)
 
 curv = []
-# Testing - set subject index to 0 for now
-subject_index = 0
-print(f'Polar Angle predictions for subject ID {subjects[subject_index]}:')
+
 for index in range(0, len(subjects)):
     # Reading new curvature data (Left hemi)
     new_data = nib.load(osp.join(path, '../..', f'raw/converted/fs-curvature/{subjects[index]}/', \
@@ -94,24 +91,28 @@ dorsal_earlyVisualCortex[final_mask_L == 1] = 1
 #     map_location='cpu')
 predictions = torch.load(
     './../../../Models/generalizability/testset_results/'
-    '/testset-intactData_model2.pt',
+    '/testset-intactData_model1.pt',
     map_location='cpu')
 
 # pred[final_mask_L == 1] = np.reshape(
 #     np.array(predictions['Predicted_values'][subject_index]),
 #     (-1, 1))
+pred_values = []
+measured_values = []
+for subject_index in range(0, len(predictions)):
+    pred_values.append(np.reshape(
+        np.array(predictions['Predicted_values'][subject_index]),
+        (-1, 1)))
+    measured_values.append(np.reshape(
+        np.array(predictions['Measured_values'][subject_index]),
+        (-1, 1)))
 
-pred[final_mask_L_ROI == 1] = np.reshape(
-    np.array(predictions['Predicted_values'][subject_index]),
-    (-1, 1))
+pred[final_mask_L_ROI == 1] = np.mean(pred_values, 0)
+measured[final_mask_L_ROI == 1] = np.mean(measured_values, 0)
 
 # measured[final_mask_L == 1] = np.reshape(
 #     np.array(predictions['Measured_values'][subject_index]),
 #     (-1, 1))
-
-measured[final_mask_L_ROI == 1] = np.reshape(
-    np.array(predictions['Measured_values'][subject_index]),
-    (-1, 1))
 
 # Rescaling
 pred = np.array(pred)
