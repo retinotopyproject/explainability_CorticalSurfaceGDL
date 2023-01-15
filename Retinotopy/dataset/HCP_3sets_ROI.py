@@ -147,13 +147,7 @@ class Retinotopy(InMemoryDataset):
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
 
-            # For generating plots based on train/dev/test sets to match participants to correct
-            # data for curvature - remove later
-            with open('./Retinotopy/participant_IDs_in_order.txt', 'a') as f:
-                f.write(f'Participant{i}: {data.subjects[i]}\n')
-
             data_list.append(data)
-
 
         train = data_list[0:int(161)]
         dev = data_list[int(161):int(171)]

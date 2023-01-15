@@ -71,6 +71,12 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
     if shuffle == True:
         np.random.shuffle(subjects)
 
+    # For generating plots based on train/dev/test sets to match participants to correct
+    # data for curvature - remove later
+    f = open(osp.join(path, '..', '..', '..', 'participant_IDs_in_order.txt'), "a")
+    f.write(f'{subjects[index]}\n')
+    print(f'Participant {index+1}: {subjects[index]}')
+    f.close()
 
     if Hemisphere == 'Right':
         # For reading new curvature data:
