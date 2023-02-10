@@ -23,10 +23,9 @@ path = './../../../Retinotopy/data/raw/converted'
 # background = np.reshape(
 #     curv['x' + hcp_id[subject_index] + '_curvature'][0][0][0:32492], (-1))
 
-
 # For new curvature data:
 # Loading subject IDs (in the order in which they were selected for train, dev, test datasets)
-with open(osp.join(path, 'D:\Retinotopy Project\surf_images', 'participant_IDs_in_order.txt')) as fp:
+with open(osp.join(path, '../../..', 'participant_IDs_in_order.txt')) as fp:
     subjects = fp.read().split("\n")
 subjects = subjects[0:len(subjects) - 1]
 # with open(osp.join(path, '../..', 'list_subj')) as fp:
@@ -52,74 +51,85 @@ for index in range(test_index_start, len(subjects)):
     # # new_data = new_data[~torch.any(new_data.isnan())]
     curv.append(new_data)
 # background = np.reshape(curv[subject_index][0][0:32492], (-1))
-subject_index = 1
-# for subject_index in range(0, 10):
-background = np.array(np.reshape(curv[subject_index][0:32492], (-1)))
+subject_index = 0
+for subject_index in range(0, 10):
+    background = np.array(np.reshape(curv[subject_index][0:32492], (-1)))
 
-threshold = 1  # threshold for the curvature map
+    threshold = 1  # threshold for the curvature map
 
-# Background settings
-nocurv = np.isnan(background)
-background[nocurv == 1] = 0
+    # Background settings
+    nocurv = np.isnan(background)
+    background[nocurv == 1] = 0
 
-# Use these to modify background into discrete colour regions - but you will have to tweak the params so 
-# it doesn't look bad for the new curv data!
-background[background > 0] = 0.3
-background[background < 0] = 0.5
-# background[background < 0] = 0
-# background[background > 0] = 1
+    # Use these to modify background into discrete colour regions - but you will have to tweak the params so 
+    # it doesn't look bad for the new curv data!
+    background[background > 0] = 0.3
+    background[background < 0] = 0.5
+    # background[background < 0] = 0
+    # background[background > 0] = 1
+
+    # ROI settings
+    label_primary_visual_areas = ['ROI']
+    final_mask_L_ROI, final_mask_R, index_L_mask, index_R_mask = roi(
+        label_primary_visual_areas)
+    ROI_masked = np.zeros((32492, 1))
+    ROI_masked[final_mask_L_ROI == 1] = 1
+
+    pred = np.zeros((32492, 1))
+    measured = np.zeros((32492, 1))
+
+    # Dorsal V1-V3
+    final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi2(['ROI'])
+    dorsal_earlyVisualCortex = np.zeros((32492, 1))
+    dorsal_earlyVisualCortex[final_mask_L == 1] = 1
+
+    # # Final mask (selecting dorsal V1-V3 vertices)
+    # mask = ROI_masked + dorsal_earlyVisualCortex
+    # mask = mask[ROI_masked == 1]
+    # # print(np.shape(mask))
+    # pred[final_mask_L_ROI == 1] = np.reshape(mask,(-1,1))
+
+    # mask = mask[ROI_masked == 1]
 
 
-# ROI settings
-label_primary_visual_areas = ['ROI']
-final_mask_L_ROI, final_mask_R, index_L_mask, index_R_mask = roi(
-    label_primary_visual_areas)
-ROI_masked = np.zeros((32492, 1))
-ROI_masked[final_mask_L_ROI == 1] = 1
+    # Loading the predictions
+    # predictions = torch.load(
+    #     './../../testset_results/left_hemi'
+    #     '/testset-pred_deepRetinotopy_PA_LH.pt',
+    #     map_location='cpu')
+    selected_model = 1
+    pred_values = []
+    measured_values = []
+    for selected_model in range(1, 6):
+        predictions = torch.load('./../../../Models/generalizability/testset_results/'
+            '/testset-intactData_model' + str(selected_model) + '.pt',
+            map_location='cpu')
 
-pred = np.zeros((32492, 1))
-measured = np.zeros((32492, 1))
+        pred_values.append(np.reshape(
+            np.array(predictions['Predicted_values'][subject_index]),
+            (-1, 1)))
+        measured_values.append(np.reshape(
+            np.array(predictions['Measured_values'][subject_index]),
+            (-1, 1)))
 
-# Dorsal V1-V3
-final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi2(['ROI'])
-dorsal_earlyVisualCortex = np.zeros((32492, 1))
-dorsal_earlyVisualCortex[final_mask_L == 1] = 1
-
-# # Final mask (selecting dorsal V1-V3 vertices)
-# mask = ROI_masked + dorsal_earlyVisualCortex
-# mask = mask[ROI_masked == 1]
-# # print(np.shape(mask))
-# pred[final_mask_L_ROI == 1] = np.reshape(mask,(-1,1))
-
-# mask = mask[ROI_masked == 1]
-
-
-# Loading the predictions
-# predictions = torch.load(
-#     './../../testset_results/left_hemi'
-#     '/testset-pred_deepRetinotopy_PA_LH.pt',
-#     map_location='cpu')
-# selected_model = 1
-for selected_model in range(1, 6):
-    predictions = torch.load('./../../../Models/generalizability/testset_results/'
-        '/testset-intactData_model' + str(selected_model) + '.pt',
-        map_location='cpu')
+    pred[final_mask_L_ROI == 1] = np.mean(pred_values, 0)
+    measured[final_mask_L_ROI == 1] = np.mean(measured_values, 0)
 
     # pred[final_mask_L == 1] = np.reshape(
     #     np.array(predictions['Predicted_values'][subject_index]),
     #     (-1, 1))
 
-    pred[final_mask_L_ROI == 1] = np.reshape(
-        np.array(predictions['Predicted_values'][subject_index]),
-        (-1, 1))
+    # pred[final_mask_L_ROI == 1] = np.reshape(
+    #     np.array(predictions['Predicted_values'][subject_index]),
+    #     (-1, 1))
 
     # measured[final_mask_L == 1] = np.reshape(
     #     np.array(predictions['Measured_values'][subject_index]),
     #     (-1, 1))
 
-    measured[final_mask_L_ROI == 1] = np.reshape(
-        np.array(predictions['Measured_values'][subject_index]),
-        (-1, 1))
+    # measured[final_mask_L_ROI == 1] = np.reshape(
+    #     np.array(predictions['Measured_values'][subject_index]),
+    #     (-1, 1))
 
     # Rescaling
     pred = np.array(pred)
@@ -186,11 +196,11 @@ for selected_model in range(1, 6):
                         '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
         bg_map=background, surf_map=np.reshape(measured[0:32492], (-1)),
         cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
-        threshold=threshold, vmax=361,
+        threshold=threshold,
         title=f'Participant {subject_index+1}: Polar angle Left hemisphere ground truth')
-    view.open_in_browser()
+    # view.open_in_browser()
 
-    # view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH\empirical_participant{subject_index+1}')
+    # view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH_mean_testset\')
 
     # Predicted map
     view = plotting.view_surf(
@@ -205,8 +215,8 @@ for selected_model in range(1, 6):
                         '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
         bg_map=background, surf_map=np.reshape(pred[0:32492], (-1)),
         cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
-        threshold=threshold, vmax=361,
-        title=f'Participant {subject_index+1}: Polar angle Left hemisphere predictions (Model {selected_model})')
-    view.open_in_browser()
+        threshold=threshold,
+        title=f'Participant {subject_index+1}: Polar angle Left hemisphere predictions (Average across all models)')
+    # view.open_in_browser()
 
-    # view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH\predicted_model{selected_model}_participant{subject_index+1}')
+    view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH_mean_testset\predicted_allmodels_participant{subject_index+1}')

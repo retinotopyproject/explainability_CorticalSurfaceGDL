@@ -27,14 +27,14 @@ number_hemi_nodes = int(number_cortical_nodes / 2)
 # Loading new curvature data for first subject (background):
 first_subject = 100610
 new_data = nib.load(osp.join(path, '../..', f'raw/converted/fs-curvature/{first_subject}/', \
-    str(first_subject) + '.L.curvature.32k_fs_LR.shape.gii'))
+    str(first_subject) + '.R.curvature.32k_fs_LR.shape.gii'))
 new_data = torch.tensor(np.reshape(new_data.agg_data().reshape((number_hemi_nodes)), 
     (-1, 1)), dtype=torch.float)
 # # Filter out NaNs if required
 # new_data = new_data.masked_fill_(torch.tensor(np.reshape(torch.any(new_data.isnan(), dim=1).reshape((number_hemi_nodes)),
 #     (-1, 1))), 0)
 # # new_data = new_data[~torch.any(new_data.isnan())]
-background = np.array(np.reshape(new_data.detach().numpy()[0:number_hemi_nodes], (-1)))
+background = np.reshape(new_data, (-1)).detach().numpy()
 
 # Background settings
 threshold = 1
@@ -53,12 +53,12 @@ pre_transform = T.Compose([T.FaceToEdge()])
 # test_dataset = Retinotopy(path, 'Test', transform=T.Cartesian(),
 #                            pre_transform=pre_transform, n_examples=181,
 #                            prediction='polarAngle', myelination=True,
-#                            hemisphere='Left')
+#                            hemisphere='Right')
 # For curvature data only (myelination=False)
 test_dataset = Retinotopy(path, 'Test', transform=T.Cartesian(),
                            pre_transform=pre_transform, n_examples=181,
                            prediction='polarAngle', myelination=False,
-                           hemisphere='Left')
+                           hemisphere='Right')
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
 
 # Average explained variance map
@@ -68,15 +68,15 @@ for data in test_loader:
 R2 = np.mean(R2, 0)
 
 # Masking
-R2_thr[final_mask_L == 1] = np.reshape(R2, (-1, 1)) + threshold
-R2_thr[final_mask_L != 1] = 0
+R2_thr[final_mask_R == 1] = np.reshape(R2, (-1, 1)) + threshold
+R2_thr[final_mask_R != 1] = 0
 
 view = plotting.view_surf(
     surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
                        'Retinotopy/data/raw/surfaces'
-                       '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
+                       '/S1200_7T_Retinotopy181.R.sphere.32k_fs_LR.surf.gii'),
     bg_map=background, surf_map=np.reshape(R2_thr[0:32492], (-1)),
     threshold=threshold, cmap='hot', black_bg=False, symmetric_cmap=False,
     vmax=60 + threshold)
 view.open_in_browser()
-view.save_as_html(f'D:\\Retinotopy Project\\surf_images\\R2_average\\R2_average_LH')
+view.save_as_html(f'D:\\Retinotopy Project\\surf_images\\R2_average\\R2_average_RH')

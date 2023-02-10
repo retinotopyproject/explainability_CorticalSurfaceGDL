@@ -16,7 +16,8 @@ import nibabel as nib
 #           '601127', '644246', '191841', '680957', '157336']
 
 # cd Manuscript/plots/left_hemi
-path = './../../../Retinotopy/data/raw/converted'
+# path = './../../../Retinotopy/data/raw/converted'
+path = './../../../Retinotopy/data/nyu_converted'
 
 # For loading old curvature data
 # curv = scipy.io.loadmat(osp.join(path, 'cifti_curv_all.mat'))['cifti_curv']
@@ -24,9 +25,9 @@ path = './../../../Retinotopy/data/raw/converted'
 #     curv['x' + hcp_id[subject_index] + '_curvature'][0][0][0:32492], (-1))
 
 
-# For new curvature data:
+# For NYU curvature data:
 # Loading subject IDs (in the order in which they were selected for train, dev, test datasets)
-with open(osp.join(path, 'D:\Retinotopy Project\surf_images', 'participant_IDs_in_order.txt')) as fp:
+with open(osp.join(path, '../..', 'participant_IDs_in_order.txt')) as fp:
     subjects = fp.read().split("\n")
 subjects = subjects[0:len(subjects) - 1]
 # with open(osp.join(path, '../..', 'list_subj')) as fp:
@@ -39,20 +40,19 @@ number_hemi_nodes = int(number_cortical_nodes / 2)
 
 curv = []
 # Index of the first subject in the testing dataset
-test_index_start = int(171)
+test_index_start = 0
+# test_index_start = 12
 for index in range(test_index_start, len(subjects)):
-    # Reading new curvature data (Left hemi) - only need to read last 10 subjects' data (test set)
-    new_data = nib.load(osp.join(path, '../..', f'raw/converted/fs-curvature/{subjects[index]}/', \
-        subjects[index] + '.L.curvature.32k_fs_LR.shape.gii'))
-    new_data = torch.tensor(np.reshape(new_data.agg_data().reshape((number_hemi_nodes)), 
-        (-1, 1)), dtype=torch.float)
-    # # Filter out NaNs
-    # new_data = new_data.masked_fill_(torch.tensor(np.reshape(torch.any(new_data.isnan(), dim=1).reshape((number_hemi_nodes)),
-    #     (-1, 1))), 0)
-    # # new_data = new_data[~torch.any(new_data.isnan())]
+    # Reading NYU curvature data (Left hemi)
+    new_data = nib.load(osp.join(path, f'sub-wlsubj{subjects[index]}', 
+        f'sub-wlsubj{subjects[index]}.curv.lh.32k_fs_LR.func.gii'))
+    new_data = torch.tensor(np.reshape(new_data.agg_data()
+        .reshape((number_hemi_nodes)), (-1, 1)), dtype=torch.float)
+    # Invert curvature values to resemble format of values in HCP dataset
+    new_data *= -1
     curv.append(new_data)
 # background = np.reshape(curv[subject_index][0][0:32492], (-1))
-subject_index = 1
+subject_index = 12
 # for subject_index in range(0, 10):
 background = np.array(np.reshape(curv[subject_index][0:32492], (-1)))
 
@@ -64,8 +64,8 @@ background[nocurv == 1] = 0
 
 # Use these to modify background into discrete colour regions - but you will have to tweak the params so 
 # it doesn't look bad for the new curv data!
-background[background > 0] = 0.3
-background[background < 0] = 0.5
+# background[background > 0] = 0.3
+# background[background < 0] = 0.5
 # background[background < 0] = 0
 # background[background > 0] = 1
 
@@ -100,9 +100,13 @@ dorsal_earlyVisualCortex[final_mask_L == 1] = 1
 #     '/testset-pred_deepRetinotopy_PA_LH.pt',
 #     map_location='cpu')
 # selected_model = 1
+num_epochs = 5
 for selected_model in range(1, 6):
-    predictions = torch.load('./../../../Models/generalizability/testset_results/'
-        '/testset-intactData_model' + str(selected_model) + '.pt',
+    # predictions = torch.load('./../../../Models/generalizability/NYU_testset_results/'
+    #     '/NYU_testset-intactData_PA_LH_model' + str(selected_model) + '.pt',
+    #     map_location='cpu')
+    predictions = torch.load('./../../../Models/generalizability/NYU_testset_fineTuned_results/'
+        f'/NYU_testset_fineTuned_{num_epochs}epochs_-intactData_PA_LH_model' + str(selected_model) + '.pt',
         map_location='cpu')
 
     # pred[final_mask_L == 1] = np.reshape(
@@ -129,6 +133,9 @@ for selected_model in range(1, 6):
     pred[sum] = pred[sum] + 180 + threshold
     pred = np.array(pred)
 
+    '''
+    Transforms data in readHCP, then transform it back here
+    '''
     measured = np.array(measured)
     minus = measured > 180
     sum = measured < 180
@@ -172,26 +179,6 @@ for selected_model in range(1, 6):
     # print(len(np.where(mask == 2)[0]))
     # new_pred[final_mask_L != 1] = 0
 
-    # Empirical map
-    # view = plotting.view_surf(
-    #     surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
-    #                        'Retinotopy/data/raw/surfaces'
-    #                        '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
-    #     surf_map=np.reshape(measured[0:32492], (-1)), bg_map=background,
-    #     cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
-    #     threshold=threshold, vmax=361)
-    view = plotting.view_surf(
-        surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
-                        'Retinotopy/data/raw/surfaces'
-                        '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
-        bg_map=background, surf_map=np.reshape(measured[0:32492], (-1)),
-        cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
-        threshold=threshold, vmax=361,
-        title=f'Participant {subject_index+1}: Polar angle Left hemisphere ground truth')
-    view.open_in_browser()
-
-    # view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH\empirical_participant{subject_index+1}')
-
     # Predicted map
     view = plotting.view_surf(
         # surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
@@ -206,7 +193,26 @@ for selected_model in range(1, 6):
         bg_map=background, surf_map=np.reshape(pred[0:32492], (-1)),
         cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
         threshold=threshold, vmax=361,
-        title=f'Participant {subject_index+1}: Polar angle Left hemisphere predictions (Model {selected_model})')
+        title=f'(NYU) Participant {subject_index+1}: Polar angle Left hemisphere predictions (Model {selected_model})')
     view.open_in_browser()
 
-    # view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH\predicted_model{selected_model}_participant{subject_index+1}')
+    # view.save_as_html(osp.join('D:\\Retinotopy Project\\surf_images\\NYU_originalCurv\\PA_LH\\', f'predicted_model{selected_model}_participant{subject_index+1}'))
+
+# Empirical map
+# view = plotting.view_surf(
+#     surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
+#                        'Retinotopy/data/raw/surfaces'
+#                        '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
+#     surf_map=np.reshape(measured[0:32492], (-1)), bg_map=background,
+#     cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
+#     threshold=threshold, vmax=361)
+view = plotting.view_surf(
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+                    'Retinotopy/data/raw/surfaces'
+                    '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
+    bg_map=background, surf_map=np.reshape(measured[0:32492], (-1)),
+    cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
+    threshold=threshold, vmax=361,
+    title=f'(NYU) Participant {subject_index+1}: Polar angle Left hemisphere ground truth')
+view.open_in_browser()
+# view.save_as_html(f'D:\\Retinotopy Project\\surf_images\\NYU_originalCurv\\PA_LH\\empirical_participant{subject_index+1}')
