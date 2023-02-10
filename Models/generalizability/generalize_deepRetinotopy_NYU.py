@@ -4,39 +4,44 @@ import torch
 import torch.nn.functional as F
 import torch_geometric.transforms as T
 import sys
-import numpy as np
 
 sys.path.append('..')
 
-from Retinotopy.dataset.HCP_3sets_ROI import Retinotopy
+from Retinotopy.dataset.NYU_3sets_ROI import Retinotopy
 from torch_geometric.data import DataLoader
 from torch_geometric.nn import SplineConv
-from Explainability.neighborhood import node_neighbourhood
 
-path = osp.join(osp.dirname(osp.realpath(__file__)), '../../Retinotopy', 'data')
+path = osp.join(osp.dirname(osp.realpath(__file__)), '../../Retinotopy',
+                'data')
 pre_transform = T.Compose([T.FaceToEdge()])
-
-hemisphere = 'Left'
+hemisphere = 'Left'  # or 'Right'
 norm_value = 70.4237
 
-# Loading test dataset
-# Myelination data is ignored (curvature data only)
+
+# Myelination data is ignored (using curvature data only)
+# dev_dataset = Retinotopy(path, 'Development',
+#                          transform=T.Cartesian(max_value=norm_value),
+#                          pre_transform=pre_transform, n_examples=181,
+#                          prediction='polarAngle', myelination=False,
+#                          hemisphere=hemisphere)
+# dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
+
 test_dataset = Retinotopy(path, 'Test',
                           transform=T.Cartesian(max_value=norm_value),
-                          pre_transform=pre_transform, n_examples=181,
+                          pre_transform=pre_transform, n_examples=43,
                           prediction='polarAngle', myelination=False,
                           hemisphere=hemisphere)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
-nodes = np.load('../nodes_earlyVisualCortex.npz')['list']
-neighborhood_sizes = np.arange(1, 21, 1)
 
 
 # Model
 class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        # No. of feature maps is 1 if only using curvature data (2 feature maps if myelination=True)
+        '''
+        No. of feature maps is 1 if only using curvature data 
+        (2 feature maps if myelination=True)
+        '''
         self.conv1 = SplineConv(1, 8, dim=3, kernel_size=25)
         self.bn1 = torch.nn.BatchNorm1d(8)
 
@@ -121,50 +126,73 @@ class Net(torch.nn.Module):
         x = F.elu(self.conv12(x, edge_index, pseudo)).view(-1)
         return x
 
-for neighborhood_size in neighborhood_sizes:
-    for i in range(5):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = Net().to(device)
-        model.load_state_dict(
-            torch.load(
-                './../output/deepRetinotopy_PA_LH_model' + str(i + 1) + '.pt',
-                map_location=device))
 
-        # Create an output folder if it doesn't already exist
-        directory = './testset_results'
-        if not osp.exists(directory):
-            os.makedirs(directory)
+for i in range(5):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = Net().to(device)
+    model.load_state_dict(
+        torch.load(
+            './../output/deepRetinotopy_PA_LH_model' + str(i + 1) + '.pt',
+            map_location=device))
 
-        for node in nodes:
-            def test():
-                model.eval()
-                MeanAbsError = 0
-                y = []
-                y_hat = []
-                for data in test_loader:
-                    # TODO why isnt this working????
-                    # value tensor of shape [7, 2] cannot be broadcast to indexing result of shape [7, 1]
-                    new_data, _ = node_neighbourhood(data, node,
-                                                     neighborhood_size, myelination=False)
-                    pred = model(new_data.to(device)).detach()
-                    y_hat.append(pred)
-                    y.append(data.to(device).y.view(-1))
-                    MAE = torch.mean(
-                        abs(data.to(device).y.view(-1) - pred)).item()
-                    MeanAbsError += MAE
-                test_MAE = MeanAbsError / len(test_loader)
-                output = {'Predicted_values': y_hat, 'Measured_values': y,
-                          'MAE': test_MAE}
-                return output
+    # Create an output folder for dev set if it doesn't already exist
+    # directory = './NYU_devset_results'
+    # if not osp.exists(directory):
+    #     os.makedirs(directory)
+
+    # Creating output folder for test set results
+    directory = './NYU_testset_results'
+    if not osp.exists(directory):
+        os.makedirs(directory)
 
 
-            evaluation = test()
+    def test():
+        model.eval()
+        '''
+        .eval() - weights of models are fixed (not calculating derivatives)
+        If eval() is removed, can use to fine tune with additional data
+        '''
 
-            torch.save({'Predicted_values': evaluation['Predicted_values'],
-                        'Measured_values': evaluation['Measured_values']},
-                       osp.join(osp.dirname(osp.realpath(__file__)),
-                                'testset_results',
-                                'testset-node' + str(
-                                    node) + '_neighborhood' + str(
-                                    neighborhood_size) + '_model' + str(
-                                    i + 1) + '.pt'))
+        MeanAbsError = 0
+        y = []
+        y_hat = []
+        # For dev set:
+        # for data in dev_loader:
+        #     pred = model(data.to(device)).detach()
+        #     y_hat.append(pred)
+        #     y.append(data.to(device).y.view(-1))
+        #     MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
+        #     MeanAbsError += MAE
+        # test_MAE = MeanAbsError / len(dev_loader)
+        
+        # For test set:
+        for data in test_loader:
+            pred = model(data.to(device)).detach()
+            y_hat.append(pred)
+            y.append(data.to(device).y.view(-1))
+            MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
+            MeanAbsError += MAE
+        test_MAE = MeanAbsError / len(test_loader)
+
+        output = {'Predicted_values': y_hat, 'Measured_values': y,
+                  'MAE': test_MAE}
+        return output
+
+
+    evaluation = test()
+
+    # For dev set:
+    # torch.save({'Predicted_values': evaluation['Predicted_values'],
+    #             'Measured_values': evaluation['Measured_values']},
+    #            osp.join(osp.dirname(osp.realpath(__file__)),
+    #                     'NYU_devset_results',
+    #                     'NYU_devset-intactData_model' + str(
+    #                         i + 1) + '.pt'))
+
+    # For test set:
+    torch.save({'Predicted_values': evaluation['Predicted_values'],
+            'Measured_values': evaluation['Measured_values']},
+            osp.join(osp.dirname(osp.realpath(__file__)),
+                    'NYU_testset_results',
+                    'NYU_testset-intactData_PA_LH_model' + str(
+                        i + 1) + '.pt'))
