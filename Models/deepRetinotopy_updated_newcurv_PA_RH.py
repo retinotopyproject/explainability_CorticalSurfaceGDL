@@ -15,38 +15,39 @@ from torch_geometric.data import DataLoader
 from torch_geometric.nn import SplineConv
 
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'Retinotopy', 'data')
-# path = 'whateverthedirectoryishere/explainability_CorticalSurfaceGDL/Retinotopy/data/'
 norm_value = 70.4237
 pre_transform = T.Compose([T.FaceToEdge()])
 
+# New datasets are using curvature information only (myelination=False)
 train_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
                             pre_transform=pre_transform, n_examples=181,
                            prediction='polarAngle', myelination=False,
                            hemisphere='Right') # Change to Left for the LH
 
-# #### Check that the train dataset is using the new curvature data (checking 1st subject only) ####
-prev_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
+'''
+Check that the train dataset is using the new curvature data 
+(checking 1st subject only)
+'''
+old_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
                             pre_transform=pre_transform, n_examples=181,
                            prediction='polarAngle', myelination=True,
                            hemisphere='Right') # Change to Left for the LH
-print(f'New data (1st subject): {train_dataset[0].x}; Shape of \'x\' data: {np.shape(train_dataset[0].x)}')
-print(f'Old data (1st subject): {prev_dataset[0].x}; Shape of \'x\' data: {np.shape(prev_dataset[0].x)}')
+print(f'New data (1st subject): {train_dataset[0].x}; Shape of \'x\' data: \
+        {np.shape(train_dataset[0].x)}')
+print(f'Old data (1st subject): {old_dataset[0].x}; Shape of \'x\' data: \
+        {np.shape(old_dataset[0].x)}')
 
-if np.shape(train_dataset[0].x)[1] == np.shape(prev_dataset[0].x)[1]:
-    raise Exception('The new dataset has the same shape as the old dataset, which also loads myelination data.' +
-    ' Make sure myelination=False in train_dataset variable.')
-elif any(torch.equal(train_dataset[0].x[0], prev_dataset[i].x[0]) for i in range(0, len(prev_dataset))):
-    raise Exception('First subject in new dataset has identical curvature values to a subject in the old' +
-    ' dataset. Check that the new curvature data is being loaded in train_dataset.')
+if np.shape(train_dataset[0].x)[1] == np.shape(old_dataset[0].x)[1]:
+    raise Exception('The new dataset has the same shape as the old dataset, ' +
+        'which also loads myelination data. ' +
+        'Make sure myelination=False in train_dataset variable.')
+elif any(torch.equal(train_dataset[0].x[0], old_dataset[i].x[0]) for i in 
+    range(0, len(old_dataset))):
+    raise Exception('First subject in new dataset has identical curvature ' +
+        'values to a subject in the old dataset. Check that the new ' +
+        'curvature data is being loaded in train_dataset.')
 else:
     print('Passed cursory subject data check')
-
-#### This was for checking correlations between the old and new datasets, please ignore ####
-
-# train_curv = [train_dataset[i].x for i in range(0, len(train_dataset))]
-# prev_curv = [torch.transpose(prev_dataset[i].x, 0, 1)[0] for i in range(0, len(prev_dataset))]
-# correlation =  np.corrcoef(train_curv[0].T, prev_curv[0])
-# np.corrcoef(train_dataset[0].x.T,prev_dataset[0].x.T[0].T)
 
 dev_dataset = Retinotopy(path, 'Development', transform=T.Cartesian(max_value=norm_value),
                          pre_transform=pre_transform, n_examples=181,
@@ -55,11 +56,15 @@ dev_dataset = Retinotopy(path, 'Development', transform=T.Cartesian(max_value=no
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
 
+
 # Model
 class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        # No. of feature maps is 1 if only using curvature data (2 feature maps if myelination=True)
+        '''
+        No. of feature maps is 1 if only using curvature data 
+        (2 feature maps if myelination=True)
+        '''
         self.conv1 = SplineConv(1, 8, dim=3, kernel_size=25)
         self.bn1 = torch.nn.BatchNorm1d(8)
 
@@ -151,6 +156,18 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 def train(epoch):
     model.train()
+    '''
+    For fine-tuning pre-trained model (for new datasets):
+    (from development)
+    for i in range(5):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = Net().to(device)
+    model.load_state_dict(
+        torch.load(
+            './../output/deepRetinotopy_PA_LH_model' + str(i + 1) + '.pt',
+            map_location=device))
+
+    '''
 
     if epoch == 100:
         for param_group in optimizer.param_groups:
@@ -222,6 +239,9 @@ if not osp.exists(directory):
 # Model training
 for i in range(5):
     for epoch in range(1, 201):
+        '''
+        For fine-tuning with new data sets - try use less epochs (maybe 50?)
+        '''
         loss, MAE = train(epoch)
         test_output = test()
         print(

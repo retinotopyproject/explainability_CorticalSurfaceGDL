@@ -8,7 +8,6 @@ from torch_geometric.data import Data
 
 # For loading new curvature data
 import nibabel as nib
-# TODO don't forget to pip install me before running code!!
 
 
 def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
@@ -42,7 +41,10 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
             data (object): object of class Data (from torch_geometric.data)
                 with attributes x, y, pos, faces and R2.
         """
-    #### For old curvature data - new data is loaded independently for each hemisphere (in if statement) ####
+    '''
+    For old curvature data - new data is loaded independently
+    for each hemisphere
+    '''
     # Loading the measures
     # curv = scipy.io.loadmat(osp.join(path, 'cifti_curv_all.mat'))['cifti_curv']
 
@@ -71,9 +73,12 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
     if shuffle == True:
         np.random.shuffle(subjects)
 
-    # For generating plots based on train/dev/test sets to match participants to correct
-    # data for curvature - remove later
-    f = open(osp.join(path, '..', '..', '..', 'participant_IDs_in_order.txt'), "a")
+    '''
+    For generating plots based on train/dev/test sets to match participants 
+    to correct data for curvature - remove later
+    '''
+    f = open(osp.join(path, '..', '..', '..', 'participant_IDs_in_order.txt'), 
+            "a")
     f.write(f'{subjects[index]}\n')
     print(f'Participant {index+1}: {subjects[index]}')
     f.close()
@@ -82,7 +87,8 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
         # For reading new curvature data:
         curv_R = nib.load(osp.join(path, 'fs-curvature', f'{subjects[index]}/', 
         subjects[index] + '.R.curvature.32k_fs_LR.shape.gii'))
-        curvature = torch.tensor(np.reshape(curv_R.agg_data().reshape((number_hemi_nodes))
+        curvature = torch.tensor(np.reshape(curv_R.agg_data()
+                        .reshape((number_hemi_nodes))
         [visual_mask_R == 1], (-1, 1)), dtype=torch.float)
 
         # Loading connectivity of triangles
@@ -96,16 +102,17 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
                 (number_hemi_nodes, 3))[visual_mask_R == 1]),
                                dtype=torch.float)
 
-        #### For reading old curvature data with a spherical surface - not necessary for
-        #### new curvature data with this same surface I don't think??
-
+        '''
+        For reading old curvature data with a spherical surface - I believe 
+        that this is not necessary/used when reading the new curvature data.
+        '''
         # if surface == 'sphere':
         #     # pos = torch.tensor(curv['pos'][0][0][
         #     #                    number_hemi_nodes:number_cortical_nodes].reshape(
         #     #     (number_hemi_nodes, 3))[visual_mask_R == 1], dtype=torch.float)
 
         # Measures for the Right hemisphere
-            R2_values = torch.tensor(np.reshape(
+        R2_values = torch.tensor(np.reshape(
             R2['x' + subjects[index] + '_fit1_r2_msmall'][0][0][
             number_hemi_nodes:number_cortical_nodes].reshape(
                 (number_hemi_nodes))[visual_mask_R == 1], (-1, 1)),
@@ -115,7 +122,7 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
             number_hemi_nodes:number_cortical_nodes].reshape(
                 (number_hemi_nodes))[visual_mask_R == 1], (-1, 1)),
             dtype=torch.float)
-        #### For reading old curvature data (see line 78 for new curvature data) ####
+        #### For reading old curvature data ####
         # curvature = torch.tensor(np.reshape(
         #     curv['x' + subjects[index] + '_curvature'][0][0][
         #     number_hemi_nodes:number_cortical_nodes].reshape(
@@ -188,9 +195,9 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
         # Loading the new curvature data:
         curv_L = nib.load(osp.join(path, 'fs-curvature', f'{subjects[index]}', 
         subjects[index] + '.L.curvature.32k_fs_LR.shape.gii'))
-        curvature = torch.tensor(np.reshape(curv_L.agg_data().reshape((number_hemi_nodes))
+        curvature = torch.tensor(np.reshape(curv_L.agg_data()
+                        .reshape((number_hemi_nodes))
         [visual_mask_L == 1], (-1, 1)), dtype=torch.float)
-
 
         # Loading connectivity of triangles
         faces = torch.tensor(faces_L.T, dtype=torch.long)  # Transforming data
@@ -203,9 +210,10 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
                 (number_hemi_nodes, 3))[visual_mask_L == 1]),
                                dtype=torch.float)
 
-        #### For reading old curvature data with a spherical surface - not necessary for
-        #### new curvature data with this same surface I don't think??
-
+        '''
+        For reading old curvature data with a spherical surface - I believe 
+        that this is not necessary/used when reading the new curvature data.
+        '''
         # if surface == 'sphere':
         #     # pos = torch.tensor(curv['pos'][0][0][0:number_hemi_nodes].reshape(
         #     #     (number_hemi_nodes, 3))[visual_mask_L == 1], dtype=torch.float)
@@ -220,7 +228,7 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
             0:number_hemi_nodes].reshape(
                 (number_hemi_nodes))[visual_mask_L == 1], (-1, 1)),
             dtype=torch.float)
-        #### For reading old curvature data (see line 183 for reading new curvature data) ####
+        #### For reading old curvature data ####
         # curvature = torch.tensor(np.reshape(
         #     curv['x' + subjects[index] + '_curvature'][0][0][
         #     0:number_hemi_nodes].reshape(

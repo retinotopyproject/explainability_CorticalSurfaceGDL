@@ -14,21 +14,33 @@ from torch_geometric.nn import SplineConv
 path = osp.join(osp.dirname(osp.realpath(__file__)), '../../Retinotopy',
                 'data')
 pre_transform = T.Compose([T.FaceToEdge()])
-hemisphere = 'Left'  # or 'Right'
 norm_value = 70.4237
 
-# Loading test dataset
-# Myelination data is ignored (curvature data only)
+# What hemisphere will sets be generated for? (set to 'Left' or 'Right')
+hemisphere = 'Left'
+# What predicted retinotopic feature? (set to 'polarAngle' or 'eccentricity')
+prediction = 'polarAngle'
+
+# For formatting of loaded/saved filename strings
+hemi_filename = hemisphere[0] # 'L' or 'R'
+if prediction == 'polarAngle':
+    prediction_filename = 'PA'
+else:
+    # prediction == 'eccentricity'
+    prediction_filename = 'ECC'
+
+# Loading dev and test dataset (10 subjects in each)
+# Myelination data is ignored (using curvature data only)
 dev_dataset = Retinotopy(path, 'Development',
                          transform=T.Cartesian(max_value=norm_value),
                          pre_transform=pre_transform, n_examples=181,
-                         prediction='polarAngle', myelination=False,
+                         prediction=prediction, myelination=False,
                          hemisphere=hemisphere)
 dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
 test_dataset = Retinotopy(path, 'Test',
                           transform=T.Cartesian(max_value=norm_value),
                           pre_transform=pre_transform, n_examples=181,
-                          prediction='polarAngle', myelination=False,
+                          prediction=prediction, myelination=False,
                           hemisphere=hemisphere)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -37,7 +49,10 @@ test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        # No. of feature maps is 1 if only using curvature data (2 feature maps if myelination=True)
+        '''
+        No. of feature maps is 1 if only using curvature data 
+        (2 feature maps if myelination=True)
+        '''
         self.conv1 = SplineConv(1, 8, dim=3, kernel_size=25)
         self.bn1 = torch.nn.BatchNorm1d(8)
 
@@ -122,21 +137,20 @@ class Net(torch.nn.Module):
         x = F.elu(self.conv12(x, edge_index, pseudo)).view(-1)
         return x
 
-
+# Loading all 5 training models
 for i in range(5):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = Net().to(device)
     model.load_state_dict(
-        torch.load(
-            './../output/deepRetinotopy_PA_LH_model' + str(i + 1) + '.pt',
-            map_location=device))
+        torch.load(f'./../output/deepRetinotopy_{prediction_filename}_' +
+        f'{hemi_filename}H_model' + str(i + 1) + '.pt', map_location=device))
 
-    # Create an output folder if it doesn't already exist
-    # directory = './devset_results'
-    # if not osp.exists(directory):
-    #     os.makedirs(directory)
+    # Create an output folder for dev set if it doesn't already exist
+    directory = './devset_results'
+    if not osp.exists(directory):
+        os.makedirs(directory)
 
-    # Creating output folder for testset results
+    # Creating output folder for test set results
     directory = './testset_results'
     if not osp.exists(directory):
         os.makedirs(directory)
@@ -144,20 +158,23 @@ for i in range(5):
 
     def test():
         model.eval()
+        '''
+        .eval() - weights of models are fixed (not calculating derivatives).
+        If eval() is removed, can use to fine-tune model with additional data.
+        '''
         MeanAbsError = 0
         y = []
         y_hat = []
         # For dev set:
-        # for data in dev_loader:
-        #     pred = model(data.to(device)).detach()
-        #     y_hat.append(pred)
-        #     y.append(data.to(device).y.view(-1))
-        #     MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
-        #     MeanAbsError += MAE
-        # test_MAE = MeanAbsError / len(dev_loader)
+        for data in dev_loader:
+            pred = model(data.to(device)).detach()
+            y_hat.append(pred)
+            y.append(data.to(device).y.view(-1))
+            MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
+            MeanAbsError += MAE
+        test_MAE = MeanAbsError / len(dev_loader)
         
         # For test set:
-        # make sure folder name is changed and file names (change to test_loader)
         for data in test_loader:
             pred = model(data.to(device)).detach()
             y_hat.append(pred)
@@ -173,18 +190,18 @@ for i in range(5):
 
     evaluation = test()
 
-    # For dev set:
-    # torch.save({'Predicted_values': evaluation['Predicted_values'],
-    #             'Measured_values': evaluation['Measured_values']},
-    #            osp.join(osp.dirname(osp.realpath(__file__)),
-    #                     'devset_results',
-    #                     'devset-intactData_model' + str(
-    #                         i + 1) + '.pt'))
+    # Save the dev set
+    torch.save({'Predicted_values': evaluation['Predicted_values'],
+                'Measured_values': evaluation['Measured_values']},
+               osp.join(osp.dirname(osp.realpath(__file__)),
+                        'devset_results', f'devset-intactData_' +
+                        f'{prediction_filename}_{hemi_filename}H_model' + str(
+                        i + 1) + '.pt'))
 
-    # For test set:
+    # Save the test set
     torch.save({'Predicted_values': evaluation['Predicted_values'],
             'Measured_values': evaluation['Measured_values']},
             osp.join(osp.dirname(osp.realpath(__file__)),
-                    'testset_results',
-                    'testset-intactData_model' + str(
+                    'testset_results', f'testset-intactData_' +
+                        f'{prediction_filename}_{hemi_filename}H_model' + str(
                         i + 1) + '.pt'))
