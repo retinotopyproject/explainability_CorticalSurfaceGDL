@@ -178,6 +178,15 @@ class Retinotopy(InMemoryDataset):
                         'development_pRFsize_RH_curv_ROI.pt',
                         'test_pRFsize_RH_curv_ROI.pt']
 
+
+    # def download(self):
+    #     raise RuntimeError(
+    #         'Dataset not found. Please download S1200_7T_Retinotopy_9Zkk.zip '
+    #         'from {} and '
+    #         'move it to {} and execute SettingDataset.sh'.format(self.url,
+    #                                                              self.raw_dir))
+
+
     def process(self):
         """
         Reads the data for each participant in the HCP dataset.
