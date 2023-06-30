@@ -1,6 +1,11 @@
 
 .vscode/
 Manuscript/plots/output/
+Manuscript/stats/output/
+Models/generalizability/devset_results/
+Models/generalizability/testset_results/
+Models/generalizability/NYU_testset_results/
+Models/generalizability/NYU_testset_fineTuned_results/
 Retinotopy/NYU_participant_IDs_in_order.txt
 Retinotopy/participant_IDs_in_order.txt
 Retinotopy/data/raw/
