@@ -2,25 +2,26 @@ import scipy.io
 import numpy as np
 import torch
 import os.path as osp
-
 from numpy.random import seed
 from torch_geometric.data import Data
-
-# For loading new curvature data
 import nibabel as nib
 
 
 def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
              shuffle=True, visual_mask_L=None, visual_mask_R=None,
              faces_L=None, faces_R=None, myelination=None, prediction=None):
-    """Read the data files and create a data object with attributes x, y, pos,
-        faces and R2.
+    """
+    Reads participant data from the HCP dataset, with a standard processing
+    pipeline applied.
+    Read the data files and create a data object with attributes x, y, pos,
+    faces and R2.
 
         Args:
             path (string): Path to raw dataset
             Hemisphere (string): 'Left' or 'Right' hemisphere
             index (int): Index of the participant
-            surface (string): Surface template
+            surface (string): Surface template ('mid'). If surface=='sphere',
+                              the method will throw an exception.
             threshold (float): threshold for selection of vertices in the
                 ROI based on the R2 of pRF modelling
             shuffle (boolean): shuffle the participants' IDs list
@@ -40,14 +41,17 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
         Returns:
             data (object): object of class Data (from torch_geometric.data)
                 with attributes x, y, pos, faces and R2.
-        """
-    '''
-    For old curvature data - new data is loaded independently
-    for each hemisphere
-    '''
-    # Loading the measures
-    # curv = scipy.io.loadmat(osp.join(path, 'cifti_curv_all.mat'))['cifti_curv']
+    """
+    # Total number of cortical nodes in the mesh
+    NUMBER_CORTICAL_NODES = int(64984)
+    # Number of nodes within each hemisphere
+    NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
 
+    '''
+    The curvature data files (with standard processing applied) are loaded 
+    independently for each hemisphere. Other features (ecc, PA, pRF size, R2,
+    myelin) are loaded for both hemispheres.
+    '''
     eccentricity = \
         scipy.io.loadmat(osp.join(path, 'cifti_eccentricity_all.mat'))[
             'cifti_eccentricity']
@@ -59,101 +63,102 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
     myelin = scipy.io.loadmat(osp.join(path, 'cifti_myelin_all.mat'))[
         'cifti_myelin']
 
-    # Defining number of nodes
-    number_cortical_nodes = int(64984)
-    number_hemi_nodes = int(number_cortical_nodes / 2)
-
     # Loading list of subjects
     with open(osp.join(path, '..', '..', 'list_subj')) as fp:
         subjects = fp.read().split("\n")
     subjects = subjects[0:len(subjects) - 1]
 
-    # Shuffling the subjects
+    # Shuffling the subjects - set the seed value for reproducible results
     seed(1)
     if shuffle == True:
         np.random.shuffle(subjects)
 
     '''
-    For generating plots based on train/dev/test sets to match participants 
-    to correct data for curvature - remove later
+    Saving each participants' ID to a text file (in the order that participants
+    are added to the training, dev, and test sets).
+    For generating plots based on train/dev/test sets, to match the participants
+    to the correct corresponding curvature maps. As data is being shuffled,
+    the order of participants must be noted to generate accurate graphs.
+    This output shouldn't be used for any purpose within the actual training
+    or validation of the model.
     '''
-    f = open(osp.join(path, '..', '..', '..', 'participant_IDs_in_order.txt'), 
-            "a")
-    f.write(f'{subjects[index]}\n')
-    print(f'Participant {index+1}: {subjects[index]}')
-    f.close()
+    # f = open(osp.join(path, '..', '..', '..', 'participant_IDs_in_order.txt'), 
+    #         "a")
+    # f.write(f'{subjects[index]}\n')
+    # print(f'Participant {index+1}: {subjects[index]}')
+    # f.close()
 
+    '''
+    Note: the Right hemisphere contains nodes with indices from 
+    NUMBER_HEMI_NODES up to NUMBER_CORTICAL_NODES - 1.
+    '''
     if Hemisphere == 'Right':
-        # For reading new curvature data:
+        # Reading curvature data with standard processing
         curv_R = nib.load(osp.join(path, 'fs-curvature', f'{subjects[index]}/', 
         subjects[index] + '.R.curvature.32k_fs_LR.shape.gii'))
         curvature = torch.tensor(np.reshape(curv_R.agg_data()
-                        .reshape((number_hemi_nodes))
+                        .reshape((NUMBER_HEMI_NODES))
         [visual_mask_R == 1], (-1, 1)), dtype=torch.float)
 
-        # Loading connectivity of triangles
+        # Loading connectivity of triangles (faces of the mesh)
         faces = torch.tensor(faces_R.T, dtype=torch.long)  # Transforming data
         # to torch data type
 
+        # Get coordinates of the Right hemisphere vertices
         if surface == 'mid':
-            # Coordinates of the Right hemisphere vertices
             pos = torch.tensor((scipy.io.loadmat(
                 osp.join(path, 'mid_pos_R.mat'))['mid_pos_R'].reshape(
-                (number_hemi_nodes, 3))[visual_mask_R == 1]),
+                (NUMBER_HEMI_NODES, 3))[visual_mask_R == 1]),
                                dtype=torch.float)
 
         '''
-        For reading old curvature data with a spherical surface - I believe 
-        that this is not necessary/used when reading the new curvature data.
+        Reading curvature data (standard processing) for a spherical surface
+        isn't configured. If surface == 'sphere', the method will throw an
+        exception. 
         '''
-        # if surface == 'sphere':
-        #     # pos = torch.tensor(curv['pos'][0][0][
-        #     #                    number_hemi_nodes:number_cortical_nodes].reshape(
-        #     #     (number_hemi_nodes, 3))[visual_mask_R == 1], dtype=torch.float)
+        if surface == 'sphere':
+            raise Exception("Reading HCP (standard proecessing) curvature " +
+                "data with a spherical surface is not configured. Please set " +
+                "the surface kwarg to 'mid' when calling this method.")
 
-        # Measures for the Right hemisphere
+        # Loading measures for the Right hemisphere
         R2_values = torch.tensor(np.reshape(
             R2['x' + subjects[index] + '_fit1_r2_msmall'][0][0][
-            number_hemi_nodes:number_cortical_nodes].reshape(
-                (number_hemi_nodes))[visual_mask_R == 1], (-1, 1)),
+            NUMBER_HEMI_NODES:NUMBER_CORTICAL_NODES].reshape(
+                (NUMBER_HEMI_NODES))[visual_mask_R == 1], (-1, 1)),
             dtype=torch.float)
         myelin_values = torch.tensor(np.reshape(
             myelin['x' + subjects[index] + '_myelinmap'][0][0][
-            number_hemi_nodes:number_cortical_nodes].reshape(
-                (number_hemi_nodes))[visual_mask_R == 1], (-1, 1)),
+            NUMBER_HEMI_NODES:NUMBER_CORTICAL_NODES].reshape(
+                (NUMBER_HEMI_NODES))[visual_mask_R == 1], (-1, 1)),
             dtype=torch.float)
-        #### For reading old curvature data ####
-        # curvature = torch.tensor(np.reshape(
-        #     curv['x' + subjects[index] + '_curvature'][0][0][
-        #     number_hemi_nodes:number_cortical_nodes].reshape(
-        #         (number_hemi_nodes))[visual_mask_R == 1], (-1, 1)),
-        #     dtype=torch.float)
-
         eccentricity_values = torch.tensor(np.reshape(
             eccentricity['x' + subjects[index] + '_fit1_eccentricity_msmall'][
                 0][0][
-            number_hemi_nodes:number_cortical_nodes].reshape(
-                (number_hemi_nodes))[visual_mask_R == 1], (-1, 1)),
+            NUMBER_HEMI_NODES:NUMBER_CORTICAL_NODES].reshape(
+                (NUMBER_HEMI_NODES))[visual_mask_R == 1], (-1, 1)),
             dtype=torch.float)
         polarAngle_values = torch.tensor(np.reshape(
             polarAngle['x' + subjects[index] + '_fit1_polarangle_msmall'][0][
                 0][
-            number_hemi_nodes:number_cortical_nodes].reshape(
-                (number_hemi_nodes))[visual_mask_R == 1], (-1, 1)),
+            NUMBER_HEMI_NODES:NUMBER_CORTICAL_NODES].reshape(
+                (NUMBER_HEMI_NODES))[visual_mask_R == 1], (-1, 1)),
             dtype=torch.float)
         pRFsize_values = torch.tensor(np.reshape(
             pRFsize['x' + subjects[index] + '_fit1_receptivefieldsize_msmall'][
                 0][0][
-            number_hemi_nodes:number_cortical_nodes].reshape(
-                (number_hemi_nodes))[visual_mask_R == 1], (-1, 1)),
+            NUMBER_HEMI_NODES:NUMBER_CORTICAL_NODES].reshape(
+                (NUMBER_HEMI_NODES))[visual_mask_R == 1], (-1, 1)),
             dtype=torch.float)
 
+        # Remove NaN values from curvature and myelination data
         nocurv = np.isnan(curvature)
         curvature[nocurv == 1] = 0
 
         nomyelin = np.isnan(myelin_values)
         myelin_values[nomyelin == 1] = 0
 
+        # Remove NaNs from other measures (R2, ecc, PA, pRF size)
         noR2 = np.isnan(R2_values)
         R2_values[noR2 == 1] = 0
 
@@ -170,12 +175,14 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
 
         pRFsize_values[condition4 == 1] = -1
 
+        # Create a graph (data) containing the required features
         if myelination == False:
             if prediction == 'polarAngle':
                 data = Data(x=curvature, y=polarAngle_values, pos=pos)
             elif prediction == 'eccentricity':
                 data = Data(x=curvature, y=eccentricity_values, pos=pos)
             else:
+                # if prediction == 'pRFsize':
                 data = Data(x=curvature, y=pRFsize_values, pos=pos)
         else:
             if prediction == 'polarAngle':
@@ -185,78 +192,80 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
                 data = Data(x=torch.cat((curvature, myelin_values), 1),
                             y=eccentricity_values, pos=pos)
             else:
+                # if prediction == 'pRFsize':
                 data = Data(x=torch.cat((curvature, myelin_values), 1),
                             y=pRFsize_values, pos=pos)
-
+        # Store faces and R2 values in the graph (data) object
         data.face = faces
         data.R2 = R2_values
 
+    '''
+    Note: the Left hemisphere is made up of nodes with indices from the first
+    node (at index 0) up to NUMBER_HEMI_NODES - 1.
+    '''
     if Hemisphere == 'Left':
-        # Loading the new curvature data:
+        # Reading curvature data with standard processing
         curv_L = nib.load(osp.join(path, 'fs-curvature', f'{subjects[index]}', 
         subjects[index] + '.L.curvature.32k_fs_LR.shape.gii'))
         curvature = torch.tensor(np.reshape(curv_L.agg_data()
-                        .reshape((number_hemi_nodes))
+                        .reshape((NUMBER_HEMI_NODES))
         [visual_mask_L == 1], (-1, 1)), dtype=torch.float)
 
-        # Loading connectivity of triangles
+        # Loading connectivity of triangles (faces of the mesh)
         faces = torch.tensor(faces_L.T, dtype=torch.long)  # Transforming data
         # to torch data type
 
-        # Coordinates of the Left hemisphere vertices
+        # Get coordinates of the Left hemisphere vertices
         if surface == 'mid':
             pos = torch.tensor((scipy.io.loadmat(
                 osp.join(path, 'mid_pos_L.mat'))['mid_pos_L'].reshape(
-                (number_hemi_nodes, 3))[visual_mask_L == 1]),
+                (NUMBER_HEMI_NODES, 3))[visual_mask_L == 1]),
                                dtype=torch.float)
 
         '''
-        For reading old curvature data with a spherical surface - I believe 
-        that this is not necessary/used when reading the new curvature data.
+        Reading curvature data (standard processing) for a spherical surface
+        isn't configured. If surface == 'sphere', the method will throw an
+        exception. 
         '''
-        # if surface == 'sphere':
-        #     # pos = torch.tensor(curv['pos'][0][0][0:number_hemi_nodes].reshape(
-        #     #     (number_hemi_nodes, 3))[visual_mask_L == 1], dtype=torch.float)
+        if surface == 'sphere':
+            raise Exception("Reading HCP (standard proecessing) curvature " +
+                "data with a spherical surface is not configured. Please set " +
+                "the surface kwarg to 'mid' when calling this method.")
 
-        # Measures for the Left hemisphere
+        # Loading measures for the Left hemisphere
         R2_values = torch.tensor(np.reshape(
             R2['x' + subjects[index] + '_fit1_r2_msmall'][0][0][
-            0:number_hemi_nodes].reshape((number_hemi_nodes))[
+            0:NUMBER_HEMI_NODES].reshape((NUMBER_HEMI_NODES))[
                 visual_mask_L == 1], (-1, 1)), dtype=torch.float)
         myelin_values = torch.tensor(np.reshape(
             myelin['x' + subjects[index] + '_myelinmap'][0][0][
-            0:number_hemi_nodes].reshape(
-                (number_hemi_nodes))[visual_mask_L == 1], (-1, 1)),
+            0:NUMBER_HEMI_NODES].reshape(
+                (NUMBER_HEMI_NODES))[visual_mask_L == 1], (-1, 1)),
             dtype=torch.float)
-        #### For reading old curvature data ####
-        # curvature = torch.tensor(np.reshape(
-        #     curv['x' + subjects[index] + '_curvature'][0][0][
-        #     0:number_hemi_nodes].reshape(
-        #         (number_hemi_nodes))[visual_mask_L == 1], (-1, 1)),
-        #     dtype=torch.float)
-
         eccentricity_values = torch.tensor(np.reshape(
             eccentricity['x' + subjects[index] + '_fit1_eccentricity_msmall'][
-                0][0][0:number_hemi_nodes].reshape((number_hemi_nodes))[
+                0][0][0:NUMBER_HEMI_NODES].reshape((NUMBER_HEMI_NODES))[
                 visual_mask_L == 1], (-1, 1)), dtype=torch.float)
         polarAngle_values = torch.tensor(np.reshape(
             polarAngle['x' + subjects[index] + '_fit1_polarangle_msmall'][0][
-                0][0:number_hemi_nodes].reshape((number_hemi_nodes))[
+                0][0:NUMBER_HEMI_NODES].reshape((NUMBER_HEMI_NODES))[
                 visual_mask_L == 1], (-1, 1)), dtype=torch.float)
         pRFsize_values = torch.tensor(np.reshape(
             pRFsize['x' + subjects[index] + '_fit1_receptivefieldsize_msmall'][
-                0][0][0:number_hemi_nodes].reshape(
-                (number_hemi_nodes))[visual_mask_L == 1], (-1, 1)),
+                0][0][0:NUMBER_HEMI_NODES].reshape(
+                (NUMBER_HEMI_NODES))[visual_mask_L == 1], (-1, 1)),
             dtype=torch.float)
 
+        # Remove NaN values from curvature and myelination data
         nocurv = np.isnan(curvature)
         curvature[nocurv == 1] = 0
 
-        noR2 = np.isnan(R2_values)
-        R2_values[noR2 == 1] = 0
-
         nomyelin = np.isnan(myelin_values)
         myelin_values[nomyelin == 1] = 0
+
+        # Remove NaNs from other measures (R2, ecc, PA, pRF size)
+        noR2 = np.isnan(R2_values)
+        R2_values[noR2 == 1] = 0
 
         # condition=R2_values < threshold
         condition2 = np.isnan(eccentricity_values)
@@ -271,18 +280,20 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
 
         pRFsize_values[condition4 == 1] = -1
 
-        # translating polar angle values
+        # Translating polar angle values
         sum = polarAngle_values < 180
         minus = polarAngle_values > 180
         polarAngle_values[sum] = polarAngle_values[sum] + 180
         polarAngle_values[minus] = polarAngle_values[minus] - 180
 
+        # Create a graph (data) containing the required features
         if myelination == False:
             if prediction == 'polarAngle':
                 data = Data(x=curvature, y=polarAngle_values, pos=pos)
             elif prediction == 'eccentricity':
                 data = Data(x=curvature, y=eccentricity_values, pos=pos)
             else:
+                # if prediction == 'pRFsize':
                 data = Data(x=curvature, y=pRFsize_values, pos=pos)
         else:
             if prediction == 'polarAngle':
@@ -292,10 +303,12 @@ def read_HCP(path, Hemisphere=None, index=None, surface=None, threshold=None,
                 data = Data(x=torch.cat((curvature, myelin_values), 1),
                             y=eccentricity_values, pos=pos)
             else:
+                # if prediction == 'pRFsize':
                 data = Data(x=torch.cat((curvature, myelin_values), 1),
                             y=pRFsize_values, pos=pos)
-
+        # Store faces and R2 values in the graph (data) object
         data.face = faces
         data.R2 = R2_values
 
     return data
+
