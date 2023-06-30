@@ -12,7 +12,7 @@ sys.path.append('../..')
 
 from Retinotopy.functions.def_ROIs_WangParcelsPlusFovea import roi
 from nilearn import plotting
-from Retinotopy.dataset.HCP_3sets_ROI import Retinotopy
+from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
 from torch_geometric.data import DataLoader
 
 

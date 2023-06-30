@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.append('..')
 
-from Retinotopy.dataset.HCP_3sets_ROI import Retinotopy
+from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
 from torch_geometric.data import DataLoader
 from torch_geometric.nn import SplineConv
 
