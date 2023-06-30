@@ -237,8 +237,7 @@ class Retinotopy(InMemoryDataset):
             data = read_NYU(path, Hemisphere=self.hemisphere, index=i,
                             surface='mid', visual_mask_L=final_mask_L,
                             visual_mask_R=final_mask_R, faces_L=faces_L,
-                            faces_R=faces_R, myelination=self.myelination,
-                            prediction=self.prediction)
+                            faces_R=faces_R, prediction=self.prediction)
             if self.pre_transform is not None:
                 # Apply a pre-transform to the data
                 data = self.pre_transform(data)
