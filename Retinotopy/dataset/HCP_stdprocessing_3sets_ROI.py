@@ -3,7 +3,7 @@ import scipy.io
 import torch
 
 from torch_geometric.data import InMemoryDataset
-from Retinotopy.read.read_HCPdata import read_HCP
+from Retinotopy.read.read_HCPdata_stdprocessing import read_HCP
 from Retinotopy.functions.labels import labels
 from Retinotopy.functions.def_ROIs_WangParcelsPlusFovea import roi
 
