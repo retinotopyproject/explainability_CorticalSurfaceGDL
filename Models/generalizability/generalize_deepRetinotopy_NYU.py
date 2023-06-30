@@ -18,18 +18,17 @@ hemisphere = 'Left'  # or 'Right'
 norm_value = 70.4237
 
 
-# Myelination data is ignored (using curvature data only)
 # dev_dataset = Retinotopy(path, 'Development',
 #                          transform=T.Cartesian(max_value=norm_value),
 #                          pre_transform=pre_transform, n_examples=181,
-#                          prediction='polarAngle', myelination=False,
+#                          prediction='polarAngle',
 #                          hemisphere=hemisphere)
 # dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
 
 test_dataset = Retinotopy(path, 'Test',
                           transform=T.Cartesian(max_value=norm_value),
                           pre_transform=pre_transform, n_examples=43,
-                          prediction='polarAngle', myelination=False,
+                          prediction='polarAngle',
                           hemisphere=hemisphere)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -39,8 +38,7 @@ class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         '''
-        No. of feature maps is 1 if only using curvature data 
-        (2 feature maps if myelination=True)
+        No. of feature maps is 1 if only using curvature data
         '''
         self.conv1 = SplineConv(1, 8, dim=3, kernel_size=25)
         self.bn1 = torch.nn.BatchNorm1d(8)

@@ -18,7 +18,7 @@ hemisphere = 'Left'  # or 'Right'
 norm_value = 70.4237
 
 # How many subjects will be allocated to a 'training' set for fine-tuning?
-num_train_subjects = 8
+num_finetuning_subjects = 8
 # How many epochs will fine-tuning occur for?
 num_epochs = 10
 
@@ -27,17 +27,17 @@ num_epochs = 10
 train_dataset = Retinotopy(path, 'Train',
                           transform=T.Cartesian(max_value=norm_value),
                           pre_transform=pre_transform, n_examples=43,
-                          prediction='polarAngle', myelination=False,
-                          hemisphere=hemisphere, fine_tuning=True,
-                          num_train_subjects=num_train_subjects)
+                          prediction='polarAngle',
+                          hemisphere=hemisphere,
+                          num_finetuning_subjects=num_finetuning_subjects)
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
 # Loading test set (contains the remaining subjects in the dataset)
 test_dataset = Retinotopy(path, 'Test',
                           transform=T.Cartesian(max_value=norm_value),
                           pre_transform=pre_transform, n_examples=43,
-                          prediction='polarAngle', myelination=False,
-                          hemisphere=hemisphere, fine_tuning=True,
-                          num_train_subjects=num_train_subjects)
+                          prediction='polarAngle',
+                          hemisphere=hemisphere,
+                          num_finetuning_subjects=num_finetuning_subjects)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 
@@ -46,8 +46,7 @@ class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         '''
-        No. of feature maps is 1 if only using curvature data 
-        (2 feature maps if myelination=True)
+        No. of feature maps is 1 if only using curvature data
         '''
         self.conv1 = SplineConv(1, 8, dim=3, kernel_size=25)
         self.bn1 = torch.nn.BatchNorm1d(8)
@@ -241,5 +240,5 @@ for i in range(5):
             'Measured_values': evaluation['Measured_values']},
             osp.join(osp.dirname(osp.realpath(__file__)),
                     'NYU_testset_fineTuned_results',
-                    f'NYU_testset_fineTuned_{num_train_subjects}subj_{num_epochs}epochs-intactData_PA_LH_model' + str(
+                    f'NYU_testset_fineTuned_{num_finetuning_subjects}subj_{num_epochs}epochs-intactData_PA_LH_model' + str(
                         i + 1) + '.pt'))

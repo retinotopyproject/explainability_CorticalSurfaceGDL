@@ -22,18 +22,16 @@ class Retinotopy(InMemoryDataset):
                  pre_transform=None,
                  pre_filter=None,
                  n_examples=None,
-                 myelination=None,
                  prediction=None,
                  hemisphere=None,
-                 fine_tuning=False,
-                 num_train_subjects=12):
+                 num_finetuning_subjects=None):
         """
         Sets the prediction characteristics (hemisphere and prediction) and
-        the feature set (myelination: True or False) for the model. Chooses 
-        one of the model's sets.
+        the feature set for the model. Chooses one of the model's sets.
         Initialises the model's required transform, pre-transform, and filter.
         Sets the file name for the processed data points (for the given 
-        model set).
+        model set). If required, initialises the model's sets for finetuning
+        to be performed.
         Args:
             root (string): root directory where the dataset should be saved
             set (string): 'Train', or 'Test' set for the model
@@ -55,26 +53,18 @@ class Retinotopy(InMemoryDataset):
                                   final dataset.
             n_examples (int): the number of participants to be loaded from the
                               dataset (HCP has 181 total participants)
-            myelination (boolean): if True, use myelination in the feature set;
-                                   if False, use only curvature as a feature
             prediction (string): 'polarAngle' or 'eccentricity'. If another
                                   value is provided, pRF size will be predicted
             hemisphere (string): 'Left' or 'Right' hemisphere
-            fine_tuning (boolean): if True, finetuning will be applied to the
-                                   already-trained model (a train set 
-                                   containing datapoints for finetuning will be
-                                   created). If False, only a test set will be 
-                                   generated.
-            num_train_subjects (int): number of subjects to add to the training 
-                                      set for fine-tuning (12 by default). If 
-                                      fine_tuning == False, value is ignored.
+            num_finetuning_subjects (int): number of subjects to add to a training 
+                                        set for finetuning the already trained
+                                        model. If == None, finetuning is not 
+                                        performed (only a test set is created)
         """
-        self.myelination = myelination
         self.prediction = prediction
         self.n_examples = int(n_examples)
         self.hemisphere = hemisphere
-        self.fine_tuning = fine_tuning
-        self.num_train_subjects = int(num_train_subjects)
+        self.num_finetuning_subjects = int(num_finetuning_subjects)
         # Super class in PyTorch Geometric implementation
         super(Retinotopy, self).__init__(root, transform, pre_transform,
                                          pre_filter)
@@ -124,93 +114,50 @@ class Retinotopy(InMemoryDataset):
             (array of strings): the file names for the processed training, 
             development, and test sets for the selected components for the
             prediction ('Left'/'Right' hemisphere, and 'polarAngle'/
-            'eccentricity'/pRF size) and given feature set (including or not 
-            including myelination data), and number of participants used in
-            finetuning.
+            'eccentricity'/pRF size) and given feature set (curvature only), 
+            and number of participants used in finetuning.
         """
         # Add additional info to filenames if fine-tuning is being used
         fine_tuning_filename = ""
-        if self.fine_tuning:
+        if self.num_finetuning_subjects is not None:
             # Add the number of subjects used to fine-tune to the filename
-            fine_tuning_filename = f'fineTuning_{self.num_train_subjects}subj_'
+            fine_tuning_filename = f'fineTuning_{self.num_finetuning_subjects}subj_'
         
         if self.hemisphere == 'Left':
-            if self.myelination == True:
-                if self.prediction == 'eccentricity':
-                    return [
-                        f'NYU_{fine_tuning_filename}training_ecc_LH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}development_ecc_LH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}test_ecc_LH_myelincurv_ROI.pt']
+            if self.prediction == 'eccentricity':
+                return [f'NYU_{fine_tuning_filename}training_ecc_LH_curv_ROI.pt',
+                        f'NYU_{fine_tuning_filename}development_ecc_LH_curv_ROI.pt',
+                        f'NYU_{fine_tuning_filename}test_ecc_LH_curv_ROI.pt']
 
-                elif self.prediction == 'polarAngle':
-                    return [
-                        f'NYU_{fine_tuning_filename}training_PA_LH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}development_PA_LH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}test_PA_LH_myelincurv_ROI.pt']
-
-                else:
-                    # For pRF size predictions (not used in the project)
-                    return [
-                        f'NYU_{fine_tuning_filename}training_pRFsize_LH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}development_pRFsize_LH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}test_pRFsize_LH_myelincurv_ROI.pt']
+            elif self.prediction == 'polarAngle':
+                return [f'NYU_{fine_tuning_filename}training_PA_LH_curv_ROI.pt',
+                        f'NYU_{fine_tuning_filename}development_PA_LH_curv_ROI.pt',
+                        f'NYU_{fine_tuning_filename}test_PA_LH_curv_ROI.pt']
             else:
-                # if self.myelination == False:
-                if self.prediction == 'eccentricity':
-                    return [f'NYU_{fine_tuning_filename}training_ecc_LH_curv_ROI.pt',
-                            f'NYU_{fine_tuning_filename}development_ecc_LH_curv_ROI.pt',
-                            f'NYU_{fine_tuning_filename}test_ecc_LH_curv_ROI.pt']
-
-                elif self.prediction == 'polarAngle':
-                    return [f'NYU_{fine_tuning_filename}training_PA_LH_curv_ROI.pt',
-                            f'NYU_{fine_tuning_filename}development_PA_LH_curv_ROI.pt',
-                            f'NYU_{fine_tuning_filename}test_PA_LH_curv_ROI.pt']
-                else:
-                    # For pRF size predictions (not used in the project)
-                    return [
-                        f'NYU_{fine_tuning_filename}training_pRFsize_LH_curv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}development_pRFsize_LH_curv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}test_pRFsize_LH_curv_ROI.pt']
+                # For pRF size predictions (not used in the project)
+                return [
+                    f'NYU_{fine_tuning_filename}training_pRFsize_LH_curv_ROI.pt',
+                    f'NYU_{fine_tuning_filename}development_pRFsize_LH_curv_ROI.pt',
+                    f'NYU_{fine_tuning_filename}test_pRFsize_LH_curv_ROI.pt']
 
         else:
             # if self.hemisphere == 'Right':
-            if self.myelination == True:
-                if self.prediction == 'eccentricity':
-                    return [
-                        f'NYU_{fine_tuning_filename}training_ecc_RH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}development_ecc_RH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}test_ecc_RH_myelincurv_ROI.pt']
+            if self.prediction == 'eccentricity':
+                return [f'NYU_{fine_tuning_filename}training_ecc_RH_curv_ROI.pt',
+                        f'NYU_{fine_tuning_filename}development_ecc_RH_curv_ROI.pt',
+                        f'NYU_{fine_tuning_filename}test_ecc_RH_curv_ROI.pt']
 
-                elif self.prediction == 'polarAngle':
-                    return [
-                        f'NYU_{fine_tuning_filename}training_PA_RH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}development_PA_RH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}test_PA_RH_myelincurv_ROI.pt']
+            elif self.prediction == 'polarAngle':
+                return [f'NYU_{fine_tuning_filename}training_PA_RH_curv_ROI.pt',
+                        f'NYU_{fine_tuning_filename}development_PA_RH_curv_ROI.pt',
+                        f'NYU_{fine_tuning_filename}test_PA_RH_curv_ROI.pt']
 
-                else:
-                    # For pRF size predictions (not used in the project)
-                    return [
-                        f'NYU_{fine_tuning_filename}training_pRFsize_RH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}development_pRFsize_RH_myelincurv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}test_pRFsize_RH_myelincurv_ROI.pt']
             else:
-                # if self.myelination == 'False':
-                if self.prediction == 'eccentricity':
-                    return [f'NYU_{fine_tuning_filename}training_ecc_RH_curv_ROI.pt',
-                            f'NYU_{fine_tuning_filename}development_ecc_RH_curv_ROI.pt',
-                            f'NYU_{fine_tuning_filename}test_ecc_RH_curv_ROI.pt']
-
-                elif self.prediction == 'polarAngle':
-                    return [f'NYU_{fine_tuning_filename}training_PA_RH_curv_ROI.pt',
-                            f'NYU_{fine_tuning_filename}development_PA_RH_curv_ROI.pt',
-                            f'NYU_{fine_tuning_filename}test_PA_RH_curv_ROI.pt']
-
-                else:
-                    # For pRF size predictions (not used in the project)
-                    return [
-                        f'NYU_{fine_tuning_filename}training_pRFsize_RH_curv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}development_pRFsize_RH_curv_ROI.pt',
-                        f'NYU_{fine_tuning_filename}test_pRFsize_RH_curv_ROI.pt']
+                # For pRF size predictions (not used in the project)
+                return [
+                    f'NYU_{fine_tuning_filename}training_pRFsize_RH_curv_ROI.pt',
+                    f'NYU_{fine_tuning_filename}development_pRFsize_RH_curv_ROI.pt',
+                    f'NYU_{fine_tuning_filename}test_pRFsize_RH_curv_ROI.pt']
 
     def process(self):
         """
@@ -244,11 +191,11 @@ class Retinotopy(InMemoryDataset):
             # Add shuffled data point to a list
             data_list.append(data)
 
-        if self.fine_tuning:
-            # Generate a train set of size (num_train_subjects)
-            train = data_list[0:self.num_train_subjects]
+        if self.num_finetuning_subjects is not None:
+            # Generate a train set of size (num_finetuning_subjects)
+            train = data_list[0:self.num_finetuning_subjects]
             # Test set contains the remaining participants
-            test = data_list[self.num_train_subjects:len(data_list)]
+            test = data_list[self.num_finetuning_subjects:len(data_list)]
             # Save sets
             torch.save(self.collate(train), self.processed_paths[0])
             torch.save(self.collate(test), self.processed_paths[2])
