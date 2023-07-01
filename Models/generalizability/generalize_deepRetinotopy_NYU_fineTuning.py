@@ -144,8 +144,6 @@ def train(epoch):
         # Zero out computation graph for each training loop
         optimizer.zero_grad()
 
-        # R2 = data.R2.view(-1)
-        # threshold = R2.view(-1) > 2.2
 
         loss = torch.nn.SmoothL1Loss()
         # Weight prediction and ground truth by confidence measure
@@ -173,14 +171,6 @@ def test():
     MeanAbsError = 0
     y = []
     y_hat = []
-    # For dev set:
-    # for data in dev_loader:
-    #     pred = model(data.to(device)).detach()
-    #     y_hat.append(pred)
-    #     y.append(data.to(device).y.view(-1))
-    #     MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
-    #     MeanAbsError += MAE
-    # test_MAE = MeanAbsError / len(dev_loader)
     
     # For test set:
     for data in test_loader:
@@ -204,11 +194,6 @@ for i in range(5):
             map_location=device))
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
-    # Create an output folder for dev set if it doesn't already exist
-    # directory = './NYU_devset_fineTuned_results'
-    # if not osp.exists(directory):
-    #     os.makedirs(directory)
-
     # Creating output folder for test set results
     directory = './NYU_testset_fineTuned_results'
     if not osp.exists(directory):
@@ -216,24 +201,11 @@ for i in range(5):
 
     for epoch in range(1, num_epochs+1):
         loss, MAE = train(epoch)
-        # test_output = test()
-        # print(
-        #     'Epoch: {:02d}, Train_loss: {:.4f}, Train_MAE: {:.4f}, Test_MAE: '
-        #     '{:.4f}, Test_MAE_thr: {:.4f}'.format(
-        #         epoch, loss, MAE, test_output['MAE'], test_output['MAE_thr']))
         print(
             'Epoch: {:02d}, Train_loss: {:.4f}, Train_MAE: {:.4f}'.format(
                 epoch, loss, MAE))
         
     evaluation = test()
-
-    # For dev set:
-    # torch.save({'Predicted_values': evaluation['Predicted_values'],
-    #             'Measured_values': evaluation['Measured_values']},
-    #            osp.join(osp.dirname(osp.realpath(__file__)),
-    #                     'NYU_devset_fineTuned_results',
-    #                     'NYU_devset_fineTuned-intactData_PA_LH_model' + str(
-    #                         i + 1) + '.pt'))
 
     # For test set:
     torch.save({'Predicted_values': evaluation['Predicted_values'],
