@@ -11,6 +11,14 @@ from torch_geometric.nn import SplineConv
 
 from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
 
+"""
+Used to create and train models on HCP training data (with a standard
+processing pipeline applied), using only curvature in the feature set. 
+5 different models will be trained, with their training and development set 
+performance evaluated. The performance of the development sets will be compared
+later for hyperparameter tuning.
+"""
+
 #### Params used for model predictions ####
 # Which hemisphere will predictions be generated for? ('Left'/'Right')
 hemisphere = 'Right'
@@ -26,14 +34,6 @@ else:
     PRED_FILENAME = 'ECC'
 
 
-"""
-Used to create and train models on HCP training data (with a standard
-processing pipeline applied), using only curvature in the feature set. 
-5 different models will be trained, with their training and development set 
-performance evaluated. The performance of the development sets will be compared
-later for hyperparameter tuning.
-"""
-
 # The number of participants (total) in all model sets
 N_EXAMPLES = 181
 
@@ -44,7 +44,7 @@ observed in the data.
 '''
 NORM_VALUE = 70.4237
 
-# Configure filepaths
+# Configure filepaths for saving the trained models
 sys.path.append('..')
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'Retinotopy', 'data')
 
@@ -213,18 +213,6 @@ def train(epoch):
                                              error (MAE)
     """
     model.train()
-    '''
-    For fine-tuning pre-trained model (for new datasets):
-    (from development)
-    for i in range(5):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = Net().to(device)
-    model.load_state_dict(
-        torch.load(
-            './../output/deepRetinotopy_PA_LH_model' + str(i + 1) + '.pt',
-            map_location=device))
-
-    '''
 
     # Set the learning rate to decay from 0.01 to 0.005 on the 100th epoch
     if epoch == 100:
@@ -267,7 +255,7 @@ def test():
         target values (y), R2, MAE, and MAE for target values exceeding an R2
         threshold of 17.
     """
-    # Set model to evaluation mode (self.train(False))
+    # Set model to evaluation mode (model weights are fixed)
     model.eval()
 
     MeanAbsError = 0
@@ -315,7 +303,7 @@ def test():
 directory = './output'
 if not osp.exists(directory):
     os.makedirs(directory)
-
+    
 # Train 5 distinct models
 for i in range(5):
     # Train each model (and evaluate dev set performance) for 200 epochs
