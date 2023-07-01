@@ -11,6 +11,21 @@ from torch_geometric.nn import SplineConv
 
 from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
 
+#### Params used for model predictions ####
+# Which hemisphere will predictions be generated for? ('Left'/'Right')
+hemisphere = 'Right'
+# What retinotopic characteristic will be predicted? ('eccentricity'/'polarAngle')
+prediction = 'polarAngle'
+
+# Create the file name components for the chosen prediction params
+HEMI_FILENAME = f'{hemisphere[0]}H'
+if prediction == 'polarAngle':
+    PRED_FILENAME = 'PA'
+else:
+    # prediction == 'eccentricity':
+    PRED_FILENAME = 'ECC'
+
+
 """
 Used to create and train models on HCP training data (with a standard
 processing pipeline applied), using only curvature in the feature set. 
@@ -40,15 +55,15 @@ pre_transform = T.Compose([T.FaceToEdge()])
 train_dataset = Retinotopy(path, 'Train', 
                            transform=T.Cartesian(max_value=NORM_VALUE),
                            pre_transform=pre_transform, n_examples=N_EXAMPLES,
-                           prediction='polarAngle', myelination=False,
-                           hemisphere='Right') # Change to Left for the LH
+                           prediction=prediction, myelination=False,
+                           hemisphere=hemisphere)
 
 # Create Development dataset (hyperparameter tuning of the model)
 dev_dataset = Retinotopy(path, 'Development', 
                          transform=T.Cartesian(max_value=NORM_VALUE),
                          pre_transform=pre_transform, n_examples=N_EXAMPLES,
-                         prediction='polarAngle', myelination=False,
-                         hemisphere='Right') # Change to Left for the LH
+                         prediction=prediction, myelination=False,
+                         hemisphere=hemisphere)
                          
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
@@ -189,7 +204,7 @@ def train(epoch):
     If required, update the optimiser learning rate to decay from 0.01 to 0.005.
     Calculate the training loss and training error, then update the model
     parameters.
-    
+
     Args:
         epoch (int): the epoch for which the model is currently being trained
     Returns:
@@ -316,7 +331,8 @@ for i in range(5):
     # Saving model's learned parameters
     torch.save(model.state_dict(),
                osp.join(osp.dirname(osp.realpath(__file__)), 'output',
-                        'deepRetinotopy_PA_RH_model' + str(i+1) + '.pt')) # Rename if LH
+                    f'deepRetinotopy_{PRED_FILENAME}_{HEMI_FILENAME}_model' + 
+                    str(i+1) + '.pt'))
 
 # To find out how long it takes to train the model:
 # end = time.time() 
