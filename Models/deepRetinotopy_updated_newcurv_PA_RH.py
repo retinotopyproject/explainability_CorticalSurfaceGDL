@@ -5,54 +5,51 @@ import torch.nn.functional as F
 import torch_geometric.transforms as T
 import sys
 import time
-
 import numpy as np
-
-sys.path.append('..')
-
-from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
 from torch_geometric.data import DataLoader
 from torch_geometric.nn import SplineConv
 
+from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
+
+"""
+Used to create and train models on HCP training data (with a standard
+processing pipeline applied), using only curvature in the feature set. 
+5 different models will be trained, with their training and development set 
+performance evaluated. The performance of the development sets will be compared
+later for hyperparameter tuning.
+"""
+
+# The number of participants (total) in all model sets
+N_EXAMPLES = 181
+
+'''
+Used in the transform applied to the data. Normalization of the transform is
+performed based on this value, instead of using the maximum possible value
+observed in the data.
+'''
+NORM_VALUE = 70.4237
+
+# Configure filepaths
+sys.path.append('..')
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'Retinotopy', 'data')
-norm_value = 70.4237
+
+# A pre-transform to be applied to the data
 pre_transform = T.Compose([T.FaceToEdge()])
 
-# New datasets are using curvature information only (myelination=False)
-train_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
-                            pre_transform=pre_transform, n_examples=181,
+# Create Training set (for training the model)
+train_dataset = Retinotopy(path, 'Train', 
+                           transform=T.Cartesian(max_value=NORM_VALUE),
+                           pre_transform=pre_transform, n_examples=N_EXAMPLES,
                            prediction='polarAngle', myelination=False,
                            hemisphere='Right') # Change to Left for the LH
 
-'''
-Check that the train dataset is using the new curvature data 
-(checking 1st subject only)
-'''
-old_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
-                            pre_transform=pre_transform, n_examples=181,
-                           prediction='polarAngle', myelination=True,
-                           hemisphere='Right') # Change to Left for the LH
-print(f'New data (1st subject): {train_dataset[0].x}; Shape of \'x\' data: \
-        {np.shape(train_dataset[0].x)}')
-print(f'Old data (1st subject): {old_dataset[0].x}; Shape of \'x\' data: \
-        {np.shape(old_dataset[0].x)}')
-
-if np.shape(train_dataset[0].x)[1] == np.shape(old_dataset[0].x)[1]:
-    raise Exception('The new dataset has the same shape as the old dataset, ' +
-        'which also loads myelination data. ' +
-        'Make sure myelination=False in train_dataset variable.')
-elif any(torch.equal(train_dataset[0].x[0], old_dataset[i].x[0]) for i in 
-    range(0, len(old_dataset))):
-    raise Exception('First subject in new dataset has identical curvature ' +
-        'values to a subject in the old dataset. Check that the new ' +
-        'curvature data is being loaded in train_dataset.')
-else:
-    print('Passed cursory subject data check')
-
-dev_dataset = Retinotopy(path, 'Development', transform=T.Cartesian(max_value=norm_value),
-                         pre_transform=pre_transform, n_examples=181,
+# Create Development dataset (hyperparameter tuning of the model)
+dev_dataset = Retinotopy(path, 'Development', 
+                         transform=T.Cartesian(max_value=NORM_VALUE),
+                         pre_transform=pre_transform, n_examples=N_EXAMPLES,
                          prediction='polarAngle', myelination=False,
                          hemisphere='Right') # Change to Left for the LH
+                         
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
 
@@ -60,10 +57,18 @@ dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
 # Model
 class Net(torch.nn.Module):
     def __init__(self):
+        """
+        Initialise the model. Create 12 convolutional layers, using a B-spline 
+        kernel. Configure methods to perform batch normalisation for each 
+        respective convolutional layer.
+        """
         super(Net, self).__init__()
+
         '''
-        No. of feature maps is 1 if only using curvature data 
-        (2 feature maps if myelination=True)
+        Input layer
+        The number of feature maps (input channels) in the first convolutional 
+        layer is 1 if curvature is the only input variable in the feature set. 
+        If myelination == True, 2 feature maps would be used in this layer.
         '''
         self.conv1 = SplineConv(1, 8, dim=3, kernel_size=25)
         self.bn1 = torch.nn.BatchNorm1d(8)
@@ -97,10 +102,30 @@ class Net(torch.nn.Module):
 
         self.conv11 = SplineConv(16, 8, dim=3, kernel_size=25)
         self.bn11 = torch.nn.BatchNorm1d(8)
-
+        
+        # Final conv layer - flatten to one output channel
         self.conv12 = SplineConv(8, 1, dim=3, kernel_size=25)
 
     def forward(self, data):
+        """
+        Performs a single forward step in the computation of the NN.
+        For each convolutional layer:
+        Input variables, edge indexes, and edge attributes are provided to the 
+        layer, and the ELU (Exponential Linear Unit) activation function is 
+        then applied to that layer.
+        Batch normalisation is performed, then dropout (a random 10% of
+        units in each layer are zeroed).
+
+        Args:
+            data (Torch DataLoader object): includes the input features, as
+                                            well as information on the input
+                                            mesh (eg. edge index and edge 
+                                            attributes) used in each conv layer
+        Returns:
+            x (Torch tensor): the output layer of the NN (the computed result
+                              from the network's initial inputs applied through
+                              each layer)
+        """
         x, edge_index, pseudo = data.x, data.edge_index, data.edge_attr
         x = F.elu(self.conv1(x, edge_index, pseudo))
         x = self.bn1(x)
@@ -146,15 +171,32 @@ class Net(torch.nn.Module):
         x = self.bn11(x)
         x = F.dropout(x, p=.10, training=self.training)
 
+        # Output layer - applying ELU activation function
         x = F.elu(self.conv12(x, edge_index, pseudo)).view(-1)
         return x
 
-
+# Check if CUDA is available for training with GPU resources
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# Transfer Net tensor to the assigned hardware resources
 model = Net().to(device)
+
+# Use Adam optimizer algorithm on model, with initial learning rate gamma=0.01
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 def train(epoch):
+    """
+    Train the model for one epoch.
+    If required, update the optimiser learning rate to decay from 0.01 to 0.005.
+    Calculate the training loss and training error, then update the model
+    parameters.
+    
+    Args:
+        epoch (int): the epoch for which the model is currently being trained
+    Returns:
+        output loss and MAE (Torch tensors): the model's respective training 
+                                             loss (smooth L1) and training
+                                             error (MAE)
+    """
     model.train()
     '''
     For fine-tuning pre-trained model (for new datasets):
@@ -169,31 +211,48 @@ def train(epoch):
 
     '''
 
+    # Set the learning rate to decay from 0.01 to 0.005 on the 100th epoch
     if epoch == 100:
         for param_group in optimizer.param_groups:
             param_group['lr'] = 0.005
 
     for data in train_loader:
+        # Assign the data point to hardware resources
         data = data.to(device)
+        # Set gradients of all optimised tensors to 0
         optimizer.zero_grad()
 
+        # Get R2 values (and R2 values over a threshold of 2.2)
         R2 = data.R2.view(-1)
         threshold = R2.view(-1) > 2.2
 
+        # Calculate training loss - smooth L1 loss
         loss = torch.nn.SmoothL1Loss()
         output_loss = loss(R2 * model(data), R2 * data.y.view(-1))
         output_loss.backward()
 
+        # Calculate training error - MAE (Mean Absolute Error)
         MAE = torch.mean(abs(
             data.to(device).y.view(-1)[threshold == 1] - model(data)[
                 threshold == 1])).item()  # To check the performance of the
         # model while training
 
+        # Update the model parameters
         optimizer.step()
+
     return output_loss.detach(), MAE
 
 
 def test():
+    """
+    Test the model's performance on the Development set - evaluate the model
+    and calculate the test error (Mean Absolute Error).
+    Returns:
+        output (dict): includes the predicted target values (y hat), measured 
+        target values (y), R2, MAE, and MAE for target values exceeding an R2
+        threshold of 17.
+    """
+    # Set model to evaluation mode (self.train(False))
     model.eval()
 
     MeanAbsError = 0
@@ -203,25 +262,30 @@ def test():
     R2_plot = []
 
     for data in dev_loader:
+        # Get predicted target values (y hat)
         pred = model(data.to(device)).detach()
         y_hat.append(pred)
+        # Get observed target values (y)
         y.append(data.to(device).y.view(-1))
 
+        # Get R2 values (and R2 values over certain thresholds)
         R2 = data.R2.view(-1)
         R2_plot.append(R2)
         threshold = R2.view(-1) > 2.2
         threshold2 = R2.view(-1) > 17
 
+        # Calculate test error per data point - MAE (two different R2 thresholds)
         MAE = torch.mean(abs(data.to(device).y.view(-1)[threshold == 1] - pred[
             threshold == 1])).item()  # To check the performance of the
-        # model while training
+        # model
         MAE_thr = torch.mean(abs(
             data.to(device).y.view(-1)[threshold2 == 1] - pred[
                 threshold2 == 1])).item()  # To check the performance of the
-        # model while training
+        # model
         MeanAbsError_thr += MAE_thr
         MeanAbsError += MAE
 
+    # Calculate test error for whole Development set - MAE
     test_MAE = MeanAbsError / len(dev_loader)
     test_MAE_thr = MeanAbsError_thr / len(dev_loader)
     output = {'Predicted_values': y_hat, 'Measured_values': y, 'R2': R2_plot,
@@ -229,41 +293,32 @@ def test():
     return output
 
 
-init = time.time() # To find out how long it takes to train the model
+# To find out how long it takes to train the model:
+# init = time.time() 
 
 # Create an output folder if it doesn't already exist
 directory = './output'
 if not osp.exists(directory):
     os.makedirs(directory)
 
-# Model training
+# Train 5 distinct models
 for i in range(5):
+    # Train each model (and evaluate dev set performance) for 200 epochs
     for epoch in range(1, 201):
-        '''
-        For fine-tuning with new data sets - try use less epochs (maybe 50?)
-        '''
         loss, MAE = train(epoch)
         test_output = test()
+        # Display the train and dev set metrics for each epoch
         print(
             'Epoch: {:02d}, Train_loss: {:.4f}, Train_MAE: {:.4f}, Test_MAE: '
             '{:.4f}, Test_MAE_thr: {:.4f}'.format(
                 epoch, loss, MAE, test_output['MAE'], test_output['MAE_thr']))
-        # if epoch % 25 == 0:  # To save intermediate predictions
-        #     torch.save({'Epoch': epoch,
-        #                 'Predicted_values': test_output['Predicted_values'],
-        #                 'Measured_values': test_output['Measured_values'],
-        #                 'R2': test_output['R2'], 'Loss': loss,
-        #                 'Dev_MAE': test_output['MAE']},
-        #                osp.join(osp.dirname(osp.realpath(__file__)),
-        #                         'output',
-        #                         'deepRetinotopy_PA_LH_output_epoch' + str(
-        #                             epoch) + '.pt')) # Rename if RH
 
     # Saving model's learned parameters
     torch.save(model.state_dict(),
                osp.join(osp.dirname(osp.realpath(__file__)), 'output',
                         'deepRetinotopy_PA_RH_model' + str(i+1) + '.pt')) # Rename if LH
 
-end = time.time() # To find out how long it takes to train the model
-time = (end - init) / 60
-print(str(time) + ' minutes')
+# To find out how long it takes to train the model:
+# end = time.time() 
+# time = (end - init) / 60
+# print(str(time) + ' minutes')
