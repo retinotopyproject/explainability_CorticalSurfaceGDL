@@ -4,24 +4,57 @@ import torch
 import torch.nn.functional as F
 import torch_geometric.transforms as T
 import sys
-
-sys.path.append('..')
-
-from Retinotopy.dataset.NYU_3sets_ROI import Retinotopy
 from torch_geometric.data import DataLoader
 from torch_geometric.nn import SplineConv
 
+from Retinotopy.dataset.NYU_3sets_ROI import Retinotopy
+
+"""
+Used to test models trained on HCP training data (with a standard
+processing pipeline applied), using only curvature in the feature set.
+The models will be tested using unseen data from the NYU retinotopic
+dataset (in a Test set). The 5 different trained models will be loaded, 
+and used to generate Test set predictions.
+"""
+
+#### Params used for model predictions ####
+# Which hemisphere will predictions be generated for? ('Left'/'Right')
+hemisphere = 'Right'
+# What retinotopic characteristic will be predicted? ('eccentricity'/'polarAngle')
+prediction = 'polarAngle'
+
+# Create the file name components for the chosen prediction params
+HEMI_FILENAME = f'{hemisphere[0]}H'
+if prediction == 'polarAngle':
+    PRED_FILENAME = 'PA'
+else:
+    # prediction == 'eccentricity':
+    PRED_FILENAME = 'ECC'
+
+
+# The number of participants (total) in NYU dataset
+N_EXAMPLES = 43
+
+'''
+Used in the transform applied to the data. Normalization of the transform is
+performed based on this value, instead of using the maximum possible value
+observed in the data.
+'''
+NORM_VALUE = 70.4237
+
+# Configure filepaths
+sys.path.append('..')
 path = osp.join(osp.dirname(osp.realpath(__file__)), '../../Retinotopy',
                 'data')
+
+# A pre-transform to be applied to the data
 pre_transform = T.Compose([T.FaceToEdge()])
-hemisphere = 'Left'  # or 'Right'
-norm_value = 70.4237
 
-
+# Loading test set of NYU data points
 test_dataset = Retinotopy(path, 'Test',
-                          transform=T.Cartesian(max_value=norm_value),
-                          pre_transform=pre_transform, n_examples=43,
-                          prediction='polarAngle',
+                          transform=T.Cartesian(max_value=NORM_VALUE),
+                          pre_transform=pre_transform, n_examples=N_EXAMPLES,
+                          prediction=prediction,
                           hemisphere=hemisphere)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -29,9 +62,18 @@ test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 # Model
 class Net(torch.nn.Module):
     def __init__(self):
+        """
+        Initialise the model. Create 12 convolutional layers, using a B-spline 
+        kernel. Configure methods to perform batch normalisation for each 
+        respective convolutional layer.
+        """
         super(Net, self).__init__()
+
         '''
-        No. of feature maps is 1 if only using curvature data
+        Input layer
+        The number of feature maps (input channels) in the first convolutional 
+        layer is 1 if curvature is the only input variable in the feature set. 
+        If myelination was used, 2 feature maps would be used in this layer.
         '''
         self.conv1 = SplineConv(1, 8, dim=3, kernel_size=25)
         self.bn1 = torch.nn.BatchNorm1d(8)
@@ -66,9 +108,29 @@ class Net(torch.nn.Module):
         self.conv11 = SplineConv(16, 8, dim=3, kernel_size=25)
         self.bn11 = torch.nn.BatchNorm1d(8)
 
+        # Final conv layer - flatten to one output channel
         self.conv12 = SplineConv(8, 1, dim=3, kernel_size=25)
 
     def forward(self, data):
+        """
+        Performs a single forward step in the computation of the NN.
+        For each convolutional layer:
+        Input variables, edge indexes, and edge attributes are provided to the 
+        layer, and the ELU (Exponential Linear Unit) activation function is 
+        then applied to that layer.
+        Batch normalisation is performed, then dropout (a random 10% of
+        units in each layer are zeroed).
+
+        Args:
+            data (Torch DataLoader object): includes the input features, as
+                                            well as information on the input
+                                            mesh (eg. edge index and edge 
+                                            attributes) used in each conv layer
+        Returns:
+            x (Torch tensor): the output layer of the NN (the computed result
+                              from the network's initial inputs applied through
+                              each layer)
+        """
         x, edge_index, pseudo = data.x, data.edge_index, data.edge_attr
         x = F.elu(self.conv1(x, edge_index, pseudo))
         x = self.bn1(x)
@@ -114,55 +176,73 @@ class Net(torch.nn.Module):
         x = self.bn11(x)
         x = F.dropout(x, p=.10, training=self.training)
 
+        # Output layer - applying ELU activation function
         x = F.elu(self.conv12(x, edge_index, pseudo)).view(-1)
         return x
 
 
+# Make predictions on unseen NYU data for all 5 trained models
 for i in range(5):
+    # Check if CUDA is available for training with GPU resources
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Transfer Net tensor to the assigned hardware resources
     model = Net().to(device)
-    model.load_state_dict(
-        torch.load(
-            './../output/deepRetinotopy_PA_LH_model' + str(i + 1) + '.pt',
-            map_location=device))
 
-    # Creating output folder for test set results
+    # Load the trained model
+    model.load_state_dict(
+        torch.load(f'./../output/deepRetinotopy_{PRED_FILENAME}_' +
+        f'{HEMI_FILENAME}_model' + str(i + 1) + '.pt', map_location=device))
+
+    # Creating output folder for Test set results
     directory = './NYU_testset_results'
     if not osp.exists(directory):
         os.makedirs(directory)
 
 
     def test():
-        model.eval()
+        """
+        Test the model's performance on the Development or Test set - evaluate 
+        the model and calculate the validation error for the given set (Mean 
+        Absolute Error).
+        Returns:
+            output (dict): includes the predicted target values (y hat), 
+                           measured target values (y), and MAE.
+        """
         '''
         .eval() - weights of models are fixed (not calculating derivatives)
         If eval() is removed, can use to fine tune with additional data
         '''
+        model.eval()
 
         MeanAbsError = 0
         y = []
         y_hat = []
 
-        # For test set:
+        # For Test set:
         for data in test_loader:
+            # Get predicted target values (y hat)
             pred = model(data.to(device)).detach()
             y_hat.append(pred)
+            # Get observed target values (y)
             y.append(data.to(device).y.view(-1))
+            # Calculate test error per data point - MAE
             MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
             MeanAbsError += MAE
+
+        # Calculate test error for entire Dev/Test set - MAE
         test_MAE = MeanAbsError / len(test_loader)
 
         output = {'Predicted_values': y_hat, 'Measured_values': y,
                   'MAE': test_MAE}
         return output
 
-
+    # Test the model
     evaluation = test()
 
-    # For test set:
+    # Save the Test set predictions and measured values
     torch.save({'Predicted_values': evaluation['Predicted_values'],
             'Measured_values': evaluation['Measured_values']},
             osp.join(osp.dirname(osp.realpath(__file__)),
-                    'NYU_testset_results',
-                    'NYU_testset-intactData_PA_LH_model' + str(
+                    'NYU_testset_results', 'NYU_testset-intactData_' +
+                        f'{PRED_FILENAME}_{HEMI_FILENAME}_model' + str(
                         i + 1) + '.pt'))
