@@ -34,6 +34,26 @@ Scripts for running our perturbation-based approach are:
 - ./explainability/explainability_deepRetinotopy_reverse.py;
 
 
+### Changes in this project fork:
+- Models/deepRetinotopy_updated_newcurv.py: modified version of
+deepRetinotopy_updated.py. Used to train models using curvature as the only
+feature in the feature set. These models also used HCP data points with a 
+more standard pre-processing pipeline applied (different to the unique 
+HCP-specific pre-processing pipeline).
+- Models/generalize_deepRetinotopy_newcurv.py: modified version of
+generalize_deepRetinotopy.py. Used to test models trained on HCP training data 
+(with a standard processing pipeline applied), using only curvature in the 
+feature set. Can be used to generate predictions and evaluate performance
+for either the Development set (used for hyperparameter tuning), or the 
+Test set (used to measure performance of the model on unseen data).
+- Models/generalize_deepRetinotopy_NYU.py: tests models trained on HCP 
+training data (with a standard processing pipeline applied), using only 
+curvature in the feature set. The models are tested using unseen data from 
+the NYU retinotopic dataset (in a Test set). This code can also be used to 
+finetune those same pre-trained models, and test the finetuned models' 
+performance on data points from the NYU dataset.
+
+
 ## Citation
 
 Please cite our papers if you used our model or if it was somewhat helpful for you :wink:
