@@ -21,7 +21,13 @@ This code can also be used to finetune models pre-trained on the HCP data
 points from the NYU dataset. If finetuning is performed, the number of 
 participants to be added to the set used for finetuning must be specified,
 as well as the number of epochs for which finetuning will take place.
+
+Note: code implementation assumes that the file is being run from the dir 
+explainability_CorticalSurfaceGDL/Models/generalizability - I have modified 
+the code to automatically set the working dir to this (if it isn't already).
 """
+# Set the working directory to Models/generalizability
+os.chdir(osp.dirname(osp.realpath(__file__)))
 
 #### Params used for model predictions ####
 # Which hemisphere will predictions be generated for? ('Left'/'Right')
@@ -343,6 +349,6 @@ for i in range(5):
     torch.save({'Predicted_values': evaluation['Predicted_values'],
             'Measured_values': evaluation['Measured_values']},
             osp.join(osp.dirname(osp.realpath(__file__)),
-                    directory[2:], f'NYU_testset{FT_FILENAME}-intactData_' +
+                    directory[2:], f'TEST_NYU_testset{FT_FILENAME}-intactData_' +
                         f'{PRED_FILENAME}_{HEMI_FILENAME}_model' + str(
                         i + 1) + '.pt'))
