@@ -15,6 +15,12 @@ processing pipeline applied), using only curvature in the feature set.
 The models will be tested using unseen data from the NYU retinotopic
 dataset (in a Test set). The 5 different trained models will be loaded, 
 and used to generate Test set predictions.
+
+This code can also be used to finetune models pre-trained on the HCP data
+(with standard processing), and test the finetuned models' performance on data
+points from the NYU dataset. If finetuning is performed, the number of 
+participants to be added to the set used for finetuning must be specified,
+as well as the number of epochs for which finetuning will take place.
 """
 
 #### Params used for model predictions ####
@@ -22,6 +28,16 @@ and used to generate Test set predictions.
 hemisphere = 'Right'
 # What retinotopic characteristic will be predicted? ('eccentricity'/'polarAngle')
 prediction = 'polarAngle'
+'''
+How many participants will be allocated to a 'Training' set for finetuning?
+If num_finetuning_subjects == None, finetuning will not be performed.
+'''
+num_finetuning_subjects = 8
+'''
+How many epochs will finetuning occur for? If num_finetuning_subjects == None,
+the value of num_epochs is ignored (as finetuning won't take place).
+'''
+num_epochs = 10
 
 # Create the file name components for the chosen prediction params
 HEMI_FILENAME = f'{hemisphere[0]}H'
@@ -30,6 +46,12 @@ if prediction == 'polarAngle':
 else:
     # prediction == 'eccentricity':
     PRED_FILENAME = 'ECC'
+# Add additional info to filenames if finetuning is being used
+FT_FILENAME = ""
+if num_finetuning_subjects is not None:
+    # Add the number of subjects used to finetune and number of epochs
+    FT_FILENAME = \
+        f'_finetuned_{num_finetuning_subjects}subj_{num_epochs}epochs'
 
 
 # The number of participants (total) in NYU dataset
@@ -50,12 +72,21 @@ path = osp.join(osp.dirname(osp.realpath(__file__)), '../../Retinotopy',
 # A pre-transform to be applied to the data
 pre_transform = T.Compose([T.FaceToEdge()])
 
-# Loading test set of NYU data points
+# If performing finetuning, load a Train set of some NYU data points
+if num_finetuning_subjects is not None:
+    train_dataset = Retinotopy(path, 'Train',
+                          transform=T.Cartesian(max_value=NORM_VALUE),
+                          pre_transform=pre_transform, n_examples=N_EXAMPLES,
+                          prediction=prediction, hemisphere=hemisphere,
+                          num_finetuning_subjects=num_finetuning_subjects)
+    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
+
+# Loading Test set of remaining NYU data points
 test_dataset = Retinotopy(path, 'Test',
                           transform=T.Cartesian(max_value=NORM_VALUE),
                           pre_transform=pre_transform, n_examples=N_EXAMPLES,
-                          prediction=prediction,
-                          hemisphere=hemisphere)
+                          prediction=prediction, hemisphere=hemisphere,
+                          num_finetuning_subjects=num_finetuning_subjects)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 
@@ -180,6 +211,58 @@ class Net(torch.nn.Module):
         x = F.elu(self.conv12(x, edge_index, pseudo)).view(-1)
         return x
 
+def train(epoch):
+    """
+    Finetune the already trained model for one epoch.
+    If required, update the optimiser learning rate to decay from 0.01 to 0.005.
+    Calculate the training loss and training error, then update the model
+    parameters.
+
+    Args:
+        epoch (int): the epoch for which the model is currently being trained
+    Returns:
+        output loss and MAE (Torch tensors): the model's respective training 
+                                             loss (smooth L1) and training
+                                             error (MAE)
+    """
+    model.train()
+
+    # Set the learning rate to decay from 0.01 to 0.005 on the 100th epoch
+    if epoch == 100:
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = 0.005
+
+    for data in train_loader:
+        # Assign the data point to hardware resources
+        data = data.to(device)
+        # Zero out computation graph for each training loop
+        optimizer.zero_grad()
+
+        # Calculate training loss - smooth L1 loss
+        loss = torch.nn.SmoothL1Loss()
+        # Weight prediction and ground truth by confidence measure
+        output_loss = loss(model(data), data.y.view(-1))
+        # Backpropagation
+        output_loss.backward()
+
+        # Calculate training error - MAE (Mean Absolute Error)
+        MAE = torch.mean(abs(
+            data.to(device).y.view(-1) - model(data))).item()
+            # To check the performance of the model while training
+
+        '''
+        Note: bias has been removed from the loss/error functions for the
+        model finetuning process. This bias was used when training the models on
+        the HCP dataset (both for data points with the HCP-specific processing
+        pipeline, and for data points with a standard processing pipeline using
+        only curvature data). This was used during model training to create 
+        better early visual cortex predictions.
+        '''
+        # Update the model parameters
+        optimizer.step()
+
+    return output_loss.detach(), MAE
+
 
 # Make predictions on unseen NYU data for all 5 trained models
 for i in range(5):
@@ -193,15 +276,29 @@ for i in range(5):
         torch.load(f'./../output/deepRetinotopy_{PRED_FILENAME}_' +
         f'{HEMI_FILENAME}_model' + str(i + 1) + '.pt', map_location=device))
 
-    # Creating output folder for Test set results
-    directory = './NYU_testset_results'
+    # If finetuning, create and use Adam optimizer algorithm on model
+    if num_finetuning_subjects is not None:
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+        # Output folder name for Test set results
+        directory = './NYU_testset_finetuned_results'
+    else:
+        # Output folder name for Test set results (no finetuning)
+        directory = './NYU_testset_results'
+    # Create output folder
     if not osp.exists(directory):
         os.makedirs(directory)
 
+    # Perform finetuning (if required) for the specified # of epochs
+    if num_finetuning_subjects is not None:
+        for epoch in range(1, num_epochs+1):
+            loss, MAE = train(epoch)
+            print(
+                'Epoch: {:02d}, Train_loss: {:.4f}, Train_MAE: {:.4f}'.format(
+                    epoch, loss, MAE))
 
     def test():
         """
-        Test the model's performance on the Development or Test set - evaluate 
+        Test the model's performance on the Test set - evaluate 
         the model and calculate the validation error for the given set (Mean 
         Absolute Error).
         Returns:
@@ -210,9 +307,12 @@ for i in range(5):
         """
         '''
         .eval() - weights of models are fixed (not calculating derivatives)
-        If eval() is removed, can use to fine tune with additional data
+        If eval() is not called, test method will be used to finetune the model 
+        with additional data.
         '''
-        model.eval()
+        if num_finetuning_subjects is None:
+            # If not finetuning, set model to evaluation mode (fix model weights)
+            model.eval()
 
         MeanAbsError = 0
         y = []
@@ -243,6 +343,6 @@ for i in range(5):
     torch.save({'Predicted_values': evaluation['Predicted_values'],
             'Measured_values': evaluation['Measured_values']},
             osp.join(osp.dirname(osp.realpath(__file__)),
-                    'NYU_testset_results', 'NYU_testset-intactData_' +
+                    directory[2:], f'NYU_testset{FT_FILENAME}-intactData_' +
                         f'{PRED_FILENAME}_{HEMI_FILENAME}_model' + str(
                         i + 1) + '.pt'))
