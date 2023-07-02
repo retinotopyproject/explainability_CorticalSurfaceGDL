@@ -43,7 +43,7 @@ num_finetuning_subjects = 8
 How many epochs will finetuning occur for? If num_finetuning_subjects == None,
 the value of num_epochs is ignored (as finetuning won't take place).
 '''
-num_epochs = 10
+num_epochs = 20
 
 # Create the file name components for the chosen prediction params
 HEMI_FILENAME = f'{hemisphere[0]}H'
@@ -349,6 +349,6 @@ for i in range(5):
     torch.save({'Predicted_values': evaluation['Predicted_values'],
             'Measured_values': evaluation['Measured_values']},
             osp.join(osp.dirname(osp.realpath(__file__)),
-                    directory[2:], f'TEST_NYU_testset{FT_FILENAME}-intactData_' +
+                    directory[2:], f'NYU_testset{FT_FILENAME}-intactData_' +
                         f'{PRED_FILENAME}_{HEMI_FILENAME}_model' + str(
                         i + 1) + '.pt'))
