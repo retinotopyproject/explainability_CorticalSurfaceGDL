@@ -17,6 +17,11 @@ processing pipeline applied), using only curvature in the feature set.
 5 different models will be trained, with their training and development set 
 performance evaluated. The performance of the development sets will be compared
 later for hyperparameter tuning.
+
+Note: code implementation assumes that the file is being run from the project
+home dir explainability_CorticalSurfaceGDL/ - if there are some issues with
+unable to find a file/directory, try changing the working dir in which the
+file is being run.
 """
 
 #### Params used for model predictions ####
