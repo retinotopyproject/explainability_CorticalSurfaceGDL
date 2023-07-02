@@ -56,15 +56,16 @@ class Retinotopy(InMemoryDataset):
             prediction (string): 'polarAngle' or 'eccentricity'. If another
                                   value is provided, pRF size will be predicted
             hemisphere (string): 'Left' or 'Right' hemisphere
-            num_finetuning_subjects (int): number of subjects to add to a training 
-                                        set for finetuning the already trained
-                                        model. If == None, finetuning is not 
-                                        performed (only a test set is created)
+            num_finetuning_subjects (int or None): number of subjects to add 
+                                        to a training set for finetuning the 
+                                        already trained model. If == None, 
+                                        finetuning is not performed (only a 
+                                        test set is created)
         """
         self.prediction = prediction
         self.n_examples = int(n_examples)
         self.hemisphere = hemisphere
-        self.num_finetuning_subjects = int(num_finetuning_subjects)
+        self.num_finetuning_subjects = num_finetuning_subjects
         # Super class in PyTorch Geometric implementation
         super(Retinotopy, self).__init__(root, transform, pre_transform,
                                          pre_filter)
