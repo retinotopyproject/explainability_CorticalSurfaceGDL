@@ -18,7 +18,13 @@ for either the Development set (used for hyperparameter tuning), or the
 Test set (used to measure performance of the model on unseen data).
 The 5 different trained models will be loaded, and used to generate predictions
 on the chosen set.
+
+Note: code implementation assumes that the file is being run from the dir 
+explainability_CorticalSurfaceGDL/Models/generalizability - I have modified 
+the code to automatically set the working dir to this (if it isn't already).
 """
+# Set the working directory to Models/generalizability
+os.chdir(osp.dirname(osp.realpath(__file__)))
 
 #### Params used for model predictions ####
 # For which set will predictions be generated for? ('Development'/'Test')
