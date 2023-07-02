@@ -18,13 +18,6 @@ hemisphere = 'Left'  # or 'Right'
 norm_value = 70.4237
 
 
-# dev_dataset = Retinotopy(path, 'Development',
-#                          transform=T.Cartesian(max_value=norm_value),
-#                          pre_transform=pre_transform, n_examples=181,
-#                          prediction='polarAngle',
-#                          hemisphere=hemisphere)
-# dev_loader = DataLoader(dev_dataset, batch_size=1, shuffle=False)
-
 test_dataset = Retinotopy(path, 'Test',
                           transform=T.Cartesian(max_value=norm_value),
                           pre_transform=pre_transform, n_examples=43,
@@ -133,11 +126,6 @@ for i in range(5):
             './../output/deepRetinotopy_PA_LH_model' + str(i + 1) + '.pt',
             map_location=device))
 
-    # Create an output folder for dev set if it doesn't already exist
-    # directory = './NYU_devset_results'
-    # if not osp.exists(directory):
-    #     os.makedirs(directory)
-
     # Creating output folder for test set results
     directory = './NYU_testset_results'
     if not osp.exists(directory):
@@ -154,15 +142,7 @@ for i in range(5):
         MeanAbsError = 0
         y = []
         y_hat = []
-        # For dev set:
-        # for data in dev_loader:
-        #     pred = model(data.to(device)).detach()
-        #     y_hat.append(pred)
-        #     y.append(data.to(device).y.view(-1))
-        #     MAE = torch.mean(abs(data.to(device).y.view(-1) - pred)).item()
-        #     MeanAbsError += MAE
-        # test_MAE = MeanAbsError / len(dev_loader)
-        
+
         # For test set:
         for data in test_loader:
             pred = model(data.to(device)).detach()
@@ -178,14 +158,6 @@ for i in range(5):
 
 
     evaluation = test()
-
-    # For dev set:
-    # torch.save({'Predicted_values': evaluation['Predicted_values'],
-    #             'Measured_values': evaluation['Measured_values']},
-    #            osp.join(osp.dirname(osp.realpath(__file__)),
-    #                     'NYU_devset_results',
-    #                     'NYU_devset-intactData_model' + str(
-    #                         i + 1) + '.pt'))
 
     # For test set:
     torch.save({'Predicted_values': evaluation['Predicted_values'],
