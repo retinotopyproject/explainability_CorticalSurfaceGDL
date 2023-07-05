@@ -7,6 +7,13 @@ from Retinotopy.functions.def_ROIs_WangParcelsPlusFovea import roi
 from Retinotopy.functions.plusFovea import add_fovea
 from Retinotopy.functions.error_metrics import smallest_angle
 
+"""
+This code was copied from the deepRetinotopy repository, from the file 
+'ModelEval_MeanDeltaTheta_ecc.py' in the Manuscript/stats/left_hemi dir
+(https://github.com/Puckett-Lab/deepRetinotopy/)
+This file can be run to create various 'ErrorPerParticipant' .npz files
+for ECC LH, which are used in Figure7b_DeltaTheta_ModelvsAverageMap.py.
+"""
 
 def ecc_difference(model):
     """Function to determine the difference between empirical
