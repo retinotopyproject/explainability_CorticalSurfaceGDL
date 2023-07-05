@@ -79,8 +79,6 @@ threshold = 1  # Threshold for the curvature map
 nocurv = np.isnan(background)
 background[nocurv == 1] = 0
 # Background settings (discretize curvature values to give a 2 colour map)
-# background[background > 0] = 0.3
-# background[background < 0] = 0.5
 background[background < 0] = 0
 background[background > 0] = 1
 
@@ -136,12 +134,22 @@ if hemisphere == 'Left':
     # Masking
     PolarAngle[final_mask_L == 1] += threshold
     PolarAngle[final_mask_L != 1] = 0
+    # Set the colour map for the Left hemi
+    cmap = 'gist_rainbow_r'
 else:
     # hemisphere == 'Right'
     PolarAngle[final_mask_R == 1] = np.reshape(PA, (-1, 1))
+    # Translating Right hemisphere polar angle values
+    PolarAngle = np.array(PolarAngle)
+    minus = PolarAngle > 180
+    sum = PolarAngle < 180
+    PolarAngle[minus] = PolarAngle[minus] - 180
+    PolarAngle[sum] = PolarAngle[sum] + 180
     # Masking
     PolarAngle[final_mask_R == 1] += threshold
     PolarAngle[final_mask_R != 1] = 0
+    # Set the colour map for the Left hemi
+    cmap = 'gist_rainbow'
 
 
 #### Create the surf plot ####
@@ -151,7 +159,7 @@ view = plotting.view_surf(
                        f'/S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
                        '.sphere.32k_fs_LR.surf.gii'),
     surf_map=np.reshape(PolarAngle[0:NUMBER_HEMI_NODES], (-1)), 
-    bg_map=background, cmap='gist_rainbow', black_bg=False, 
+    bg_map=background, cmap=cmap, black_bg=False, 
     symmetric_cmap=False, threshold=threshold, vmax=361,
     title=f'Polar angle {hemisphere} hemisphere mean ground truth (training set)')
 
