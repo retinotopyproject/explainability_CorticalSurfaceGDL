@@ -79,7 +79,7 @@ curv_data = torch.tensor(np.reshape(
 background = np.array(np.reshape(
                         curv_data.detach().numpy()[0:NUMBER_HEMI_NODES], (-1)))
 
-threshold = 1  # Threshold for the curvature map
+threshold = 10  # Threshold for the curvature map
 
 # Remove NaNs from curvature map
 nocurv = np.isnan(background)
@@ -145,15 +145,11 @@ if hemisphere == 'Left':
     # Masking
     ecc_thr[final_mask_L == 1] = np.reshape(ecc, (-1, 1)) * 10 + threshold
     ecc_thr[final_mask_L != 1] = 0
-    # Set the colour map for the Left hemi
-    cmap = 'gist_rainbow_r'
 else:
     # hemisphere == 'Right'
     # Masking
     ecc_thr[final_mask_R == 1] = np.reshape(ecc, (-1, 1)) * 10 + threshold
     ecc_thr[final_mask_R != 1] = 0
-    # Set the colour map for the Right hemi
-    cmap = 'gist_rainbow'
 
 
 #### Create the surf plot ####
@@ -163,7 +159,8 @@ view = plotting.view_surf(
                        f'/S1200_7T_Retinotopy181.{HEMI_FILENAME}' + 
                        '.sphere.32k_fs_LR.surf.gii'),
     surf_map=np.reshape(ecc_thr[0:NUMBER_HEMI_NODES], (-1)), bg_map=background,
-    cmap=cmap, black_bg=False, symmetric_cmap=False, threshold=threshold, vmax=130,
+    cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False, 
+    threshold=threshold, vmax=130,
     title=f'Eccentricity {hemisphere} hemisphere mean ground truth (training set)')
 
 # Show in web browser
