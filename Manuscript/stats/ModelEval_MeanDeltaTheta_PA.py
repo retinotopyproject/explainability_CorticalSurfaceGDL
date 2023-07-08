@@ -229,7 +229,7 @@ def PA_difference(model):
                 f'./../testset_results/testset-{models[m]}_deepRetinotopy_' +
                 f'PA_{HEMI_FILENAME}H.pt', map_location='cpu')
 
-            # ROI seetings
+            # ROI settings
             label_primary_visual_areas = ['ROI']
             final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
                 label_primary_visual_areas)
