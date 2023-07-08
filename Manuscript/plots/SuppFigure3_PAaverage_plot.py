@@ -25,7 +25,13 @@ the HCP-specific processing pipeline).
 A map of the first participants' curvature data will be used as a background
 to the mean PA map on the plotted surface.
 Mean PA maps are generated per hemisphere (either Left or Right hemisphere).
+
+Note: code implementation assumes that the file is being run from the dir 
+Manuscript/plots - I have modified the code to automatically set the 
+working dir to this (if it isn't already).
 """
+# Set the working directory to Manuscript/plots
+os.chdir(osp.dirname(osp.realpath(__file__)))
 
 #### Params used for model predictions ####
 # Which hemisphere will predictions be generated for? ('Left'/'Right')
