@@ -154,7 +154,7 @@ else:
     # Masking
     PolarAngle[final_mask_R == 1] += threshold
     PolarAngle[final_mask_R != 1] = 0
-    # Set the colour map for the Left hemi
+    # Set the colour map for the Right hemi
     cmap = 'gist_rainbow'
 
 
@@ -172,5 +172,5 @@ view = plotting.view_surf(
 # Show in web browser
 view.open_in_browser()
 # Save plot as a HTML file
-# view.save_as_html(f'D:\\Retinotopy Project\\surf_images\\PA_{HEMI_FILENAME}H_mean_trainset\\empirical_mean_trainset_LH')
+# view.save_as_html(f'D:\\Retinotopy Project\\surf_images\\PA_{HEMI_FILENAME}H_mean_trainset\\empirical_mean_trainset_{HEMI_FILENAME}H')
 
