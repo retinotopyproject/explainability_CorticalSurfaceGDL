@@ -22,10 +22,10 @@ files are also required for these other .py files to run correctly -
 see the docstrings in these files for more details about the requirements.
 
 Note: code implementation assumes that the file is being run from the dir 
-Manuscript/plots/left_hemi - I have modified the code to automatically set the 
+Manuscript/plots - I have modified the code to automatically set the 
 working dir to this (if it isn't already).
 """
-# Set the working directory to Manuscript/plots/left_hemi
+# Set the working directory to Manuscript/plots
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 # Configure filepaths
@@ -45,32 +45,32 @@ def error_plots(hemisphere, retinotopic_feature):
     """
 
     error_DorsalEarlyVisualCortex_model = np.reshape(np.array(
-        np.load('./../../stats/output/ErrorPerParticipant_' + str(
+        np.load('./../stats/output/ErrorPerParticipant_' + str(
             retinotopic_feature) + '_' + str(
             hemisphere) + '_dorsalV1-3_deepRetinotopy_1-8.npz')['list']),
         (10, -1))
     error_EarlyVisualCortex_model = np.reshape(np.array(
-        np.load('./../../stats/output/ErrorPerParticipant_' + str(
+        np.load('./../stats/output/ErrorPerParticipant_' + str(
             retinotopic_feature) + '_' + str(
             hemisphere) + '_EarlyVisualCortex_deepRetinotopy_1-8.npz')['list']),
         (10, -1))
     error_higherOrder_model = np.reshape(np.array(
-        np.load('./../../stats/output/ErrorPerParticipant_' + str(
+        np.load('./../stats/output/ErrorPerParticipant_' + str(
             retinotopic_feature) + '_' + str(
             hemisphere) + '_WangParcels_deepRetinotopy_1-8.npz')['list']), (10, -1))
 
     error_DorsalEarlyVisualCortex_average = np.reshape(np.array(
-        np.load('./../../stats/output/ErrorPerParticipant_' + str(
+        np.load('./../stats/output/ErrorPerParticipant_' + str(
             retinotopic_feature) + '_' + str(
             hemisphere) + '_dorsalV1-3_average_1-8.npz')['list']),
         (10, -1))
     error_EarlyVisualCortex_average = np.reshape(np.array(
-        np.load('./../../stats/output/ErrorPerParticipant_' + str(
+        np.load('./../stats/output/ErrorPerParticipant_' + str(
             retinotopic_feature) + '_' + str(
             hemisphere) + '_EarlyVisualCortex_average_1-8.npz')[
             'list']), (10, -1))
     error_higherOrder_average = np.reshape(np.array(
-        np.load('./../../stats/output/ErrorPerParticipant_' + str(
+        np.load('./../stats/output/ErrorPerParticipant_' + str(
             retinotopic_feature) + '_' + str(
             hemisphere) + '_WangParcels_average_1-8.npz')['list']),
         (10, -1))
@@ -179,7 +179,7 @@ def error_plots(hemisphere, retinotopic_feature):
     if retinotopic_feature == 'pRFcenter':
         plt.ylim([0, 3])
 
-    # plt.savefig('./../output/DeltaTheta_ModelvsAverage.pdf', format="pdf")
+    # plt.savefig('./output/DeltaTheta_ModelvsAverage.pdf', format="pdf")
     return plt.show()
 
 
