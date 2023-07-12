@@ -4,9 +4,32 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.stats
 import sys
+import os
 
+"""
+This code was copied from the deepRetinotopy repository, from the file 
+'Figure7b_DeltaTheta_ModelvsAverageMap.py' in the Manuscript/plots/left_hemi 
+dir (https://github.com/Puckett-Lab/deepRetinotopy/)
+
+The code generates a point plot of prediction error based on the model 
+predictions and an average-based prediction. Plots can be generated for 
+the Left or Right hemisphere, for either polar angle or eccentricity values.
+
+To generate this plot, several other files must be generated first by 
+running either ModelEval_MeanDeltaTheta_ECC.py (for eccentricity LH or RH),
+or ModelEval_MeanDelta_Theta_PA.py (for polar angle LH or RH). Certain other
+files are also required for these other .py files to run correctly -
+see the docstrings in these files for more details about the requirements.
+
+Note: code implementation assumes that the file is being run from the dir 
+Manuscript/plots/left_hemi - I have modified the code to automatically set the 
+working dir to this (if it isn't already).
+"""
+# Set the working directory to Manuscript/plots/left_hemi
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
+# Configure filepaths
 sys.path.append('../..')
-
 
 def error_plots(hemisphere, retinotopic_feature):
     """Function to generate error plot.
@@ -162,4 +185,8 @@ def error_plots(hemisphere, retinotopic_feature):
 
 error_plots('LH', 'PA')
 error_plots('LH', 'ecc')
-error_plots('LH', 'pRFcenter')
+# error_plots('RH', 'PA')
+# error_plots('RH', 'ecc')
+
+# pRF center was not used as a retinotopic feature for this project
+# error_plots('LH', 'pRFcenter')
