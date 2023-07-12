@@ -30,7 +30,14 @@ The code requires that several other files are generated first:
     Copy the model 'testset-intactData_PA_{L or R}H_model*.pt' to 
     Manuscript/testset_results, then rename the model to 
     'testset-pred_deepRetinotopy_PA_{L or R}H.pt'.
+
+Note: code implementation assumes that the file is being run from the dir 
+Manuscript/stats - I have modified the code to automatically set the 
+working dir to this (if it isn't already).
 """
+# Set the working directory to Manuscript/stats
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
 #### Params used for model predictions ####
 # Which hemisphere will predictions be generated for? ('Left'/'Right')
 hemisphere = 'Left'
@@ -83,20 +90,22 @@ def PA_difference(model):
             final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
                 label_primary_visual_areas)
             ROI1 = np.zeros((NUMBER_HEMI_NODES, 1))
+            # Apply relevant hemisphere's mask to ROI1
+            if hemisphere == 'Left':
+                ROI1[final_mask_L == 1] = 1
+            else:
+                # hemisphere == 'Right'
+                ROI1[final_mask_R == 1] = 1
 
             # Visual areas
             final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi2(
                 visual_areas[k])
             primary_visual_areas = np.zeros((NUMBER_HEMI_NODES, 1))
-            primary_visual_areas[final_mask_L == 1] = 1
-
-            # Apply relevant hemisphere's mask to ROI1 and primary visual areas
+            # Apply relevant hemisphere's mask to primary visual areas
             if hemisphere == 'Left':
-                ROI1[final_mask_L == 1] = 1
                 primary_visual_areas[final_mask_L == 1] = 1
             else:
                 # hemisphere == 'Right'
-                ROI1[final_mask_R == 1] = 1
                 primary_visual_areas[final_mask_R == 1] = 1
 
             # Final mask
@@ -234,19 +243,22 @@ def PA_difference(model):
             final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
                 label_primary_visual_areas)
             ROI1 = np.zeros((NUMBER_HEMI_NODES, 1))
+            # Apply relevant hemisphere's mask to ROI1
+            if hemisphere == 'Left':
+                ROI1[final_mask_L == 1] = 1
+            else:
+                # hemisphere == 'Right'
+                ROI1[final_mask_R == 1] = 1
 
             # Visual areas
             final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi2(
                 visual_areas[k])
             primary_visual_areas = np.zeros((NUMBER_HEMI_NODES, 1))
-
-            # Apply relevant hemisphere's mask to ROI1 and primary visual areas
+            # Apply relevant hemisphere's mask to primary visual areas
             if hemisphere == 'Left':
-                ROI1[final_mask_L == 1] = 1
                 primary_visual_areas[final_mask_L == 1] = 1
             else:
                 # hemisphere == 'Right'
-                ROI1[final_mask_R == 1] = 1
                 primary_visual_areas[final_mask_R == 1] = 1
 
             # Final mask
@@ -292,8 +304,9 @@ def PA_difference(model):
             mean_delta.append(mean_theta_withinsubj)
         mean_delta = np.reshape(np.array(mean_delta), (1, -1))
 
-    np.savez(f'./output/ErrorPerParticipant_PA_LH_dorsalV1-3_{str(model)}_' +
-            '1-8.npz', list=np.reshape(theta_withinsubj, (10, -1)))
+    np.savez(f'./output/ErrorPerParticipant_PA_{HEMI_FILENAME}H_' +
+            f'dorsalV1-3_{str(model)}_1-8.npz', 
+            list=np.reshape(theta_withinsubj, (10, -1)))
 
 
 # Create an output folder if it doesn't already exist
