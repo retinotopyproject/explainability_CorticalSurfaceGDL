@@ -32,7 +32,7 @@ os.chdir(osp.dirname(osp.realpath(__file__)))
 hemisphere = 'Left'
 
 # Will the correlation graph and generated data be saved? (True or False)
-save_files = False
+save_files = True
 
 # Create the file name components for the chosen hemisphere ('L'/'H')
 HEMI_FILENAME = hemisphere[0]
@@ -48,7 +48,7 @@ NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
 # Configure filepaths
 sys.path.append('..')
 # Location of participants' curvature data
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', '..', '..', 
+path = osp.join(osp.dirname(osp.realpath(__file__)), '..', '..', 
                     'Retinotopy', 'data', 'raw', 'converted')
 
 # Loading HCP participant IDs
