@@ -1,107 +1,99 @@
 import os
 import os.path as osp
 import torch
-import torch.nn.functional as F
 import torch_geometric.transforms as T
 import sys
-import time
-
 import scipy.io
 import numpy as np
 import nibabel as nib
-
-sys.path.append('..')
-
-from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
-from torch_geometric.data import DataLoader
-from torch_geometric.nn import SplineConv
-
-norm_value = 70.4237
-
-# Defining number of nodes
-number_cortical_nodes = int(64984)
-number_hemi_nodes = int(number_cortical_nodes / 2)
-
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'Retinotopy', 'data')
-pre_transform = T.Compose([T.FaceToEdge()])
-
-'''
-Setting up the training dataset and previously used dataset (that contains
-myelination data), checking the correlation between them.
-'''
-# train_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
-#                             pre_transform=pre_transform, n_examples=181,
-#                            prediction='polarAngle', myelination=False,
-#                            hemisphere='Left') # Change to Right for the RH
-                           
-# prev_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(max_value=norm_value),
-#                             pre_transform=pre_transform, n_examples=181,
-#                            prediction='polarAngle', myelination=True,
-#                            hemisphere='Left') # Change to Right for the RH
-
-# train_curv = [train_dataset[i].x for i in range(0, len(train_dataset))]
-# prev_curv = [torch.transpose(prev_dataset[i].x, 0, 1)[0] 
-#               for i in range(0, len(prev_dataset))]
-# correlations = np.asarray([np.corrcoef(train_dataset[i].x.T, 
-#       prev_dataset[i].x.T[0].T)[0][1] for i in range (0, len(train_dataset))])
-
-# Loading subject IDs
-with open(osp.join(path, 'list_subj')) as fp:
-    subjects = fp.read().split("\n")
-subjects = subjects[0:len(subjects) - 1]
-
-# For checking correlations with unprocessed data (no visual masks applied):
-
-# Loading the measures
-curv = scipy.io.loadmat(osp.join(path, 'raw', 'converted', 
-        'cifti_curv_all.mat'))['cifti_curv']
-
-old_curvature = []
-new_curvature = []
-
-for index in range(0, len(subjects)):
-    # Reading old curvature data with visual mask removed (Left hemi)
-    old_data = torch.tensor(np.reshape(
-        curv['x' + subjects[index] + '_curvature'][0][0][
-        0:number_hemi_nodes].reshape(
-            (number_hemi_nodes)), (-1, 1)),
-        dtype=torch.float)
-    # Filter out NaNs
-    old_data = old_data.masked_fill_(torch.tensor(np.reshape(torch.any(
-        old_data.isnan(), dim=1).reshape((number_hemi_nodes)), (-1, 1))), 0)
-    old_curvature.append(old_data)
-
-    # Reading new curvature data with no visual mask applied (Left hemi)
-    new_data = nib.load(osp.join(path, f'raw/converted/fs-curvature/\
-        {subjects[index]}/', subjects[index] + 
-        '.L.curvature.32k_fs_LR.shape.gii'))
-    new_data = torch.tensor(np.reshape(new_data.agg_data()
-        .reshape((number_hemi_nodes)), (-1, 1)), dtype=torch.float)
-    # Filter out NaNs
-    new_data = new_data.masked_fill_(torch.tensor(np.reshape(torch.any(
-        new_data.isnan(), dim=1).reshape((number_hemi_nodes)),(-1, 1))), 0)
-    new_curvature.append(new_data)
-
-correlations = np.asarray([np.corrcoef(new_curvature[i].T, 
-    old_curvature[i].T[0].T, dtype=float)[0][1] 
-    for i in range (0, len(subjects))])
-
-'''
-Plotting data
-'''
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# Create dataframe
-df = pd.DataFrame({'Subject': [i for i in range(0, len(subjects))], 
+
+"""
+The code in this file was used to calculate and graph the Pearson correlation
+coefficient for Left hemisphere curvature data of each participant in the HCP 
+dataset. This specifically measures the correlation between curvature data 
+processed using the HCP-specific processing pipeline, and curvature data 
+processed using a more typical, 'standard' processing pipeline. The visual 
+mask has been removed to calculate the correlations between curvature data.
+
+Note: code implementation assumes that the file is being run from the dir 
+Manuscript/plots/left_hemi - I have modified the code to automatically set the 
+working dir to this (if it isn't already).
+"""
+# Set the working directory to Manuscript/plots/left_hemi
+os.chdir(osp.dirname(osp.realpath(__file__)))
+
+# Total number of cortical nodes in the mesh
+NUMBER_CORTICAL_NODES = int(64984)
+# Number of nodes within each hemisphere
+NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
+
+# Configure filepaths
+sys.path.append('..')
+# Location of participants' curvature data
+path = osp.join(osp.dirname(osp.realpath(__file__)), '..', '..', '..', 
+                    'Retinotopy', 'data', 'raw', 'converted')
+
+
+# Loading HCP participant IDs
+with open(osp.join(path, '..', '..', 'list_subj')) as fp:
+    subj = fp.read().split("\n")
+subj = subj[0:len(subj) - 1]
+
+
+# Loading curvature data with the HCP-specific processing pipeline applied
+curv_hcp = scipy.io.loadmat(osp.join(path, 'cifti_curv_all.mat'))['cifti_curv']
+
+curv_hcp_values = []
+curv_std_values = []
+
+for index in range(0, len(subj)):
+    # Reading HCP processing pipeline curvature data with visual mask removed
+    data_hcp = torch.tensor(np.reshape(
+        curv_hcp['x' + subj[index] + '_curvature'][0][0][
+        0:NUMBER_HEMI_NODES].reshape(
+            (NUMBER_HEMI_NODES)), (-1, 1)),
+        dtype=torch.float)
+    # Filter out NaNs
+    data_hcp = data_hcp.masked_fill_(torch.tensor(np.reshape(torch.any(
+        data_hcp.isnan(), dim=1).reshape((NUMBER_HEMI_NODES)), (-1, 1))), 0)
+    curv_hcp_values.append(data_hcp)
+
+    # Reading standard processing pipeline curvature data (visual mask removed)
+    data_std = nib.load(osp.abspath(osp.join(path, 'fs-curvature',
+        f'{subj[index]}', subj[index] + '.L.curvature.32k_fs_LR.shape.gii')))
+    data_std = torch.tensor(np.reshape(data_std.agg_data()
+        .reshape((NUMBER_HEMI_NODES)), (-1, 1)), dtype=torch.float)
+    # Filter out NaNs
+    data_std = data_std.masked_fill_(torch.tensor(np.reshape(torch.any(
+        data_std.isnan(), dim=1).reshape((NUMBER_HEMI_NODES)),(-1, 1))), 0)
+    curv_std_values.append(data_std)
+
+# Calculate the Pearson correlation coefficient
+correlations = np.asarray([np.corrcoef(curv_std_values[i].T, 
+    curv_hcp_values[i].T[0].T, dtype=float)[0][1] 
+    for i in range (0, len(subj))])
+
+
+#### Plotting data: ####
+
+# Create a Pandas DataFrame for the graph
+df = pd.DataFrame({'Subject': [i for i in range(0, len(subj))], 
         'Correlation': correlations})
 
+# Create an output folder if it doesn't already exist
+directory = './output'
+if not os.path.exists(directory):
+    os.makedirs(directory)
+
 # Save correlation data to text file
-# f = open('correlations_LH.txt', "w")
+# f = open('./output/correlations_LH.txt', "w")
 # f.write('Correlation data (Left hemisphere)\n')
-# f.writelines([f'Subject: {i}; ID: {subjects[i]}; \
-#   Correlation: {correlations[i]}\n' for i in range(0, len(subjects))])
+# f.writelines([f'Subject: {i}; ID: {subj[i]}; \
+#   Correlation: {correlations[i]}\n' for i in range(0, len(subj))])
 # f.close()
 
 # Graph settings
@@ -109,13 +101,7 @@ sns.set(style="darkgrid")
 sns
 sns.regplot(df, x=df['Subject'], y=df['Correlation'], fit_reg=True)
 # Save to file
-plt.savefig('correlations_LH.png', dpi=300)
-
-# Show subjects with correlation values <=0.4
-# low_correlation = {f'Subject ID: {subjects[i]} Subject index in list: {i}': 
-#     correlations[i] for i in range(0, len(correlations)) 
-#     if correlations[i] <= 0.4}
-# print(low_correlation)
+# plt.savefig('./output/correlations_LH.png', dpi=300)
 
 # Show graph
 plt.show()
