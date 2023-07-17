@@ -52,7 +52,7 @@ class Retinotopy(InMemoryDataset):
                                   the data object should be included in the 
                                   final dataset.
             n_examples (int): the number of participants to be loaded from the
-                              dataset (HCP has 181 total participants)
+                              dataset (NYU has 43 participants)
             prediction (string): 'polarAngle' or 'eccentricity'. If another
                                   value is provided, pRF size will be predicted
             hemisphere (string): 'Left' or 'Right' hemisphere
