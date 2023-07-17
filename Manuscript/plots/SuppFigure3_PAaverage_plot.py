@@ -38,7 +38,7 @@ os.chdir(osp.dirname(osp.realpath(__file__)))
 hemisphere = 'Left'
 
 # Create the file name components for the chosen prediction params
-HEMI_FILENAME = hemisphere[0]
+HEMI_FILENAME = hemisphere[0] 
 
 
 # The number of participants (total) in all model sets
@@ -68,8 +68,8 @@ first_subj = subj[0]
 
 
 #### Loading curvature data for the first subject in training set ####
-curv_data = nib.load(osp.join(path_curv, '../..', 
-    f'raw/converted/fs-curvature/{first_subj}/', str(first_subj) + 
+curv_data = nib.load(osp.join(path_curv,
+    f'fs-curvature/{first_subj}/', str(first_subj) + 
     f'.{HEMI_FILENAME}.curvature.32k_fs_LR.shape.gii'))
 curv_data = torch.tensor(np.reshape(
                 curv_data.agg_data().reshape((NUMBER_HEMI_NODES)), (-1, 1)), 
