@@ -19,10 +19,10 @@ sets where the model was finetuned after training. Plots for either the
 Left or Right hemisphere can be created.
 
 Note: code implementation assumes that the file is being run from the dir 
-explainability_CorticalSurfaceGDL/Manuscript/plots/left_hemi - I have modified 
+explainability_CorticalSurfaceGDL/Manuscript/plots - I have modified 
 the code to automatically set the working dir to this (if it isn't already).
 """
-# Set the working directory to Manuscript/plots/left_hemi
+# Set the working directory to Manuscript/plots
 os.chdir(osp.join(osp.dirname(osp.realpath(__file__))))
 
 #### Params for selecting a model and a participant to plot ####
@@ -68,7 +68,7 @@ NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
 # Configure filepaths
 sys.path.append('../..')
 # For loading participants' curvature data
-path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 
+path = osp.join(osp.dirname(osp.realpath(__file__)), '../..', 
                 'Retinotopy/data/nyu_converted')
 
 
@@ -156,7 +156,7 @@ pred = np.zeros((NUMBER_HEMI_NODES, 1))
 measured = np.zeros((NUMBER_HEMI_NODES, 1))
 
 # Load PA predictions and measured values
-predictions = torch.load(osp.join('./../../..', 'Models', 'generalizability', 
+predictions = torch.load(osp.join('./../..', 'Models', 'generalizability', 
 testset_results_dir, f'NYU_testset{FT_FILENAME}-intactData_PA_' + 
 f'{HEMI_FILENAME}H_model{str(selected_model)}.pt'), map_location='cpu')
 
@@ -193,7 +193,7 @@ pred[final_mask_ROI != 1] = 0 # Removes data from outside the ROI
 
 #### Plot the predictions for the chosen model ####
 view = plotting.view_surf(
-    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                     'Retinotopy/data/raw/surfaces',
                     f'S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
                     '.sphere.32k_fs_LR.surf.gii'),
@@ -206,7 +206,7 @@ view.open_in_browser()
 
 #### Plot the empirical data ####
 view = plotting.view_surf(
-    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                     'Retinotopy/data/raw/surfaces',
                     f'S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
                     '.sphere.32k_fs_LR.surf.gii'),
