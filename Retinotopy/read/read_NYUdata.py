@@ -136,12 +136,6 @@ def read_NYU(path, Hemisphere=None, index=None, surface=None,
         # Convert from radians to degrees
         polarAngle_values = polarAngle_values * (180/np.pi)
 
-        # Translating polar angle values
-        sum = polarAngle_values < 180
-        minus = polarAngle_values > 180
-        polarAngle_values[sum] = polarAngle_values[sum] + 180
-        polarAngle_values[minus] = polarAngle_values[minus] - 180
-
         # Create a graph (data) containing the required features
         if prediction == 'polarAngle':
             data = Data(x=curvature, y=polarAngle_values, pos=pos)
