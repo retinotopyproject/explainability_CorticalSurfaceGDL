@@ -12,8 +12,9 @@ This code was copied from the deepRetinotopy repository, from the file
 dir (https://github.com/Puckett-Lab/deepRetinotopy/)
 
 The code generates a point plot of prediction error based on the model 
-predictions and an average-based prediction. Plots can be generated for 
-the Left or Right hemisphere, for either polar angle or eccentricity values.
+test set predictions and an average-based prediction. Plots can be generated for 
+the Left or Right hemisphere, for either polar angle or eccentricity values,
+for participants in either the HCP test set or the NYU test set.
 
 To generate this plot, several other files must be generated first by 
 running either ModelEval_MeanDeltaTheta_ECC.py (for eccentricity LH or RH),
@@ -31,49 +32,62 @@ os.chdir(os.path.dirname(os.path.realpath(__file__)))
 # Configure filepaths
 sys.path.append('../..')
 
-def error_plots(hemisphere, retinotopic_feature):
+def error_plots(hemisphere, retinotopic_feature, dataset='HCP'):
     """Function to generate error plot.
 
     Args:
         hemisphere (str): 'LH' or 'RH'.
         retinotopic_feature (str): 'PA' or 'ecc' or 'pRFcenter'.
+        dataset (str): for which dataset will plots be created?
+                       ('HCP' or 'NYU')
 
 
     Returns:
         Point plot of prediction error from our models' predictions and an
         average-based prediction.
     """
+    # Set the file names and number of test set participants (based on the dataset used)
+    if dataset == 'HCP':
+        dataset_filename = ''
+        # 10 participants in the test set
+        testset_size = 10
+    elif dataset == 'NYU':
+        dataset_filename = dataset + '_'
+        # 43 participants in the test set
+        testset_size = 43
 
+    # Load the error per participant files
     error_DorsalEarlyVisualCortex_model = np.reshape(np.array(
-        np.load('./../stats/output/ErrorPerParticipant_' + str(
-            retinotopic_feature) + '_' + str(
+        np.load(f'./../stats/output/{dataset_filename}ErrorPerParticipant_' + 
+            str(retinotopic_feature) + '_' + str(
             hemisphere) + '_dorsalV1-3_deepRetinotopy_1-8.npz')['list']),
-        (10, -1))
+        (testset_size, -1))
     error_EarlyVisualCortex_model = np.reshape(np.array(
-        np.load('./../stats/output/ErrorPerParticipant_' + str(
-            retinotopic_feature) + '_' + str(
+        np.load(f'./../stats/output/{dataset_filename}ErrorPerParticipant_' + 
+            str(retinotopic_feature) + '_' + str(
             hemisphere) + '_EarlyVisualCortex_deepRetinotopy_1-8.npz')['list']),
-        (10, -1))
+        (testset_size, -1))
     error_higherOrder_model = np.reshape(np.array(
-        np.load('./../stats/output/ErrorPerParticipant_' + str(
-            retinotopic_feature) + '_' + str(
-            hemisphere) + '_WangParcels_deepRetinotopy_1-8.npz')['list']), (10, -1))
+        np.load(f'./../stats/output/{dataset_filename}ErrorPerParticipant_' + 
+            str(retinotopic_feature) + '_' + str(
+            hemisphere) + '_WangParcels_deepRetinotopy_1-8.npz')['list']), 
+            (testset_size, -1))
 
     error_DorsalEarlyVisualCortex_average = np.reshape(np.array(
-        np.load('./../stats/output/ErrorPerParticipant_' + str(
-            retinotopic_feature) + '_' + str(
+        np.load(f'./../stats/output/{dataset_filename}ErrorPerParticipant_' + 
+            str(retinotopic_feature) + '_' + str(
             hemisphere) + '_dorsalV1-3_average_1-8.npz')['list']),
-        (10, -1))
+        (testset_size, -1))
     error_EarlyVisualCortex_average = np.reshape(np.array(
-        np.load('./../stats/output/ErrorPerParticipant_' + str(
-            retinotopic_feature) + '_' + str(
+        np.load(f'./../stats/output/{dataset_filename}ErrorPerParticipant_' + 
+            str(retinotopic_feature) + '_' + str(
             hemisphere) + '_EarlyVisualCortex_average_1-8.npz')[
-            'list']), (10, -1))
+            'list']), (testset_size, -1))
     error_higherOrder_average = np.reshape(np.array(
-        np.load('./../stats/output/ErrorPerParticipant_' + str(
-            retinotopic_feature) + '_' + str(
+        np.load(f'./../stats/output/{dataset_filename}ErrorPerParticipant_' + 
+            str(retinotopic_feature) + '_' + str(
             hemisphere) + '_WangParcels_average_1-8.npz')['list']),
-        (10, -1))
+        (testset_size, -1))
 
     # Reformatting data from dorsal early visual cortex
     data_earlyVisualCortexDorsal = np.concatenate([
@@ -159,23 +173,33 @@ def error_plots(hemisphere, retinotopic_feature):
         plt.title(title[i])
 
         # Prediction error for the same participants
-        for j in range(10):
+        for j in range(testset_size):
             x = [eval('df_' + str(i))['Prediction'][j],
-                 eval('df_' + str(i))['Prediction'][j + 10]]
+                 eval('df_' + str(i))['Prediction'][j + testset_size]]
             y = [eval('df_' + str(i))['$\Delta$$\t\Theta$'][j],
-                 eval('df_' + str(i))['$\Delta$$\t\Theta$'][j + 10]]
+                 eval('df_' + str(i))['$\Delta$$\t\Theta$'][j + testset_size]]
             ax.plot(x, y, color='black', alpha=0.1)
+            # Rescale Dorsal/Early Visual Cortex axes differently per dataset
             if retinotopic_feature == 'PA':
-                plt.ylim([10, 35])
+                plt.ylim([10, 35])  # HCP scaling (default)
+                if dataset == 'NYU':
+                    plt.ylim([10, 70])  # NYU scaling
             if retinotopic_feature == 'ecc':
-                plt.ylim([0, 2])
+                plt.ylim([0, 2])    # HCP scaling (default)
+                if dataset == 'NYU':
+                    plt.ylim([1.5, 10])    # NYU scaling
             if retinotopic_feature == 'pRFcenter':
                 plt.ylim([0, 1])
             # plt.ylim([15, 45])
+    # Rescale Higher Order Visual Areas y axes differently for each dataset
     if retinotopic_feature == 'PA':
-        plt.ylim([30, 75])
+        plt.ylim([30, 75])  # HCP scaling (default)
+        if dataset == 'NYU':
+            plt.ylim([15, 110])  # NYU scaling
     if retinotopic_feature == 'ecc':
-        plt.ylim([1.5, 4])
+        plt.ylim([1.5, 4])  # HCP scaling (default)
+        if dataset == 'NYU':
+            plt.ylim([4, 15]) # NYU scaling
     if retinotopic_feature == 'pRFcenter':
         plt.ylim([0, 3])
 
@@ -183,10 +207,14 @@ def error_plots(hemisphere, retinotopic_feature):
     return plt.show()
 
 
-error_plots('LH', 'PA')
-error_plots('LH', 'ecc')
-# error_plots('RH', 'PA')
-# error_plots('RH', 'ecc')
+error_plots('LH', 'PA', 'HCP')
+error_plots('LH', 'ecc', 'HCP')
+# error_plots('RH', 'PA', 'HCP')
+# error_plots('RH', 'ecc', 'HCP')
+# error_plots('LH', 'PA', 'NYU')
+# error_plots('LH', 'ecc', 'NYU')
+# error_plots('RH', 'PA', 'NYU')
+# error_plots('RH', 'ecc', 'NYU')
 
 # pRF center was not used as a retinotopic feature for this project
 # error_plots('LH', 'pRFcenter')
