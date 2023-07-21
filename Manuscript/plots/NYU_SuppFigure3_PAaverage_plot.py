@@ -59,7 +59,7 @@ with open(osp.join(path, '..', 'NYU_participant_IDs_in_order.txt')) as fp:
     subj = fp.read().split("\n")
 subj = subj[0:len(subj) - 1]
 '''
-Get the ID of the first participant in the NYU Train set. The curvature data 
+Get the ID of the first participant in the NYU Test set. The curvature data 
 for this participant is used as a background on the plotted surface.
 '''
 first_subj = subj[0]
