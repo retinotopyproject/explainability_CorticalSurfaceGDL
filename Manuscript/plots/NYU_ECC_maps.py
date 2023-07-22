@@ -10,6 +10,10 @@ from nilearn import plotting
 from Retinotopy.functions.def_ROIs_WangParcelsPlusFovea import roi
 
 """
+This code was taken from the deepRetinotopy repository and modified, from the 
+file 'Eccentricity_maps_LH.py' in the Manuscript/plots/left_hemi dir
+(https://github.com/Puckett-Lab/deepRetinotopy/)
+
 This code is used to generate maps of Eccentricity predictions versus
 measured/empirical values, for an NYU dataset participant from the test set. 
 The plots can be generated for both non-finetuned NYU test sets, and NYU test 
