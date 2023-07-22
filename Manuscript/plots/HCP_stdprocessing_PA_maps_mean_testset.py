@@ -132,13 +132,13 @@ predictions = torch.load(osp.join('./../..','Models', 'generalizability',
 
 pred_values = []
 measured_values = []
-for subject_index in range(0, len(predictions)):
+for participant_index in range(0, len(predictions)):
     # Apply ROI mask to predicted and measured values
     pred_values.append(np.reshape(
-        np.array(predictions['Predicted_values'][subject_index]),
+        np.array(predictions['Predicted_values'][participant_index]),
         (-1, 1)))
     measured_values.append(np.reshape(
-        np.array(predictions['Measured_values'][subject_index]),
+        np.array(predictions['Measured_values'][participant_index]),
         (-1, 1)))
 
 # Calculate the mean predicted and empirical maps
