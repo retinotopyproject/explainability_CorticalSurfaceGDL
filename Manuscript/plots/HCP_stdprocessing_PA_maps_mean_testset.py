@@ -22,10 +22,10 @@ A map of the last test set participant's curvature data will be used
 as a background to the mean PA map on the plotted surface.
 
 Note: code implementation assumes that the file is being run from the dir 
-explainability_CorticalSurfaceGDL/Manuscript/plots/left_hemi - I have modified 
+explainability_CorticalSurfaceGDL/Manuscript/plots - I have modified 
 the code to automatically set the working dir to this (if it isn't already).
 """
-# Set the working directory to Manuscript/plots/left_hemi
+# Set the working directory to Manuscript/plots
 os.chdir(osp.join(osp.dirname(osp.realpath(__file__))))
 
 #### Params for selecting a model and a participant to plot ####
@@ -49,7 +49,7 @@ NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
 # Configure filepaths
 sys.path.append('../..')
 # For loading participants' curvature data
-path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 
+path = osp.join(osp.dirname(osp.realpath(__file__)), '../..', 
                 'Retinotopy/data/raw/converted')
 
 
@@ -125,7 +125,7 @@ pred = np.zeros((NUMBER_HEMI_NODES, 1))
 measured = np.zeros((NUMBER_HEMI_NODES, 1))
 
 # Load PA predictions and measured values
-predictions = torch.load(osp.join('./../../..','Models', 'generalizability', 
+predictions = torch.load(osp.join('./../..','Models', 'generalizability', 
     'testset_results', 
     f'testset-intactData_PA_{HEMI_FILENAME}H_model{str(selected_model)}.pt'),
     map_location='cpu')
@@ -170,7 +170,7 @@ pred[final_mask_ROI != 1] = 0 # Removes data from outside ROI
 
 #### Plot the mean test set predictions for the chosen model ####
 view = plotting.view_surf(
-    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                     'Retinotopy/data/raw/surfaces',
                     f'S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
                     '.sphere.32k_fs_LR.surf.gii'),
@@ -183,7 +183,7 @@ view.open_in_browser()
 
 #### Plot the mean empirical test set data ####
 view = plotting.view_surf(
-    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                     'Retinotopy/data/raw/surfaces',
                     f'S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
                     '.sphere.32k_fs_LR.surf.gii'),
