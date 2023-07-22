@@ -23,10 +23,10 @@ these maps for HCP data pre-processed using a standard processing pipeline
 Mean R2 maps are generated per hemisphere (either Left or Right hemisphere).
 
 Note: code implementation assumes that the file is being run from the dir 
-explainability_CorticalSurfaceGDL/Manuscript/plots/left_hemi - I have modified 
+explainability_CorticalSurfaceGDL/Manuscript/plots - I have modified 
 the code to automatically set the working dir to this (if it isn't already).
 """
-# Set the working directory to Manuscript/plots/left_hemi
+# Set the working directory to Manuscript/plots
 os.chdir(osp.join(osp.dirname(osp.realpath(__file__))))
 
 #### Params for selecting a model to plot ####
@@ -47,7 +47,7 @@ NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
 # Configure filepaths
 sys.path.append('../..')
 # For loading data from the Training set
-path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 'Retinotopy/data')
+path = osp.join(osp.dirname(osp.realpath(__file__)), '../..', 'Retinotopy/data')
 # For loading participants' curvature data
 path_curv = osp.join(path, 'raw/converted')
 
@@ -119,7 +119,7 @@ R2_thr[final_mask != 1] = 0
 
 #### Plot the explained variance map ####
 view = plotting.view_surf(
-    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                        'Retinotopy/data/raw/surfaces' +
                        f'/S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
                        '.sphere.32k_fs_LR.surf.gii'),
