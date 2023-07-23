@@ -14,8 +14,12 @@ from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
 
 
 """
-This file was used to graph 
-TODO
+This file is used to graph the curvature maps for individual participants,
+in both the HCP and NYU datasets. In the HCP dataset, curvature plots with the
+HCP-specific pre-processing pipeline applied can be generated; HCP curvature 
+maps with a more standard pre-processing pipeline can also be plotted.
+Maps can be generated for either the Left or Right hemisphere, for any 
+single participant in the datasets.
 
 Note: code implementation assumes that the file is being run from the dir 
 explainability_CorticalSurfaceGDL/Manuscript/plots - I have modified 
@@ -250,8 +254,6 @@ def plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Left', view_plot=True)
     
     # Applying masking
     curv_masked = np.zeros((NUMBER_HEMI_NODES, 1))
-
-    # New curvature - Masking - only translating values up
     curv_masked[final_mask == 1] = (np.reshape(np.asarray(
                             curv[subj_index][final_mask == 1]), (-1, 1)) + 1.5)
     curv_masked[final_mask != 1] = 0
@@ -275,8 +277,112 @@ def plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Left', view_plot=True)
         view.open_in_browser()
 
 
+def read_NYU_curv(hemisphere='Left'):
+    """
+    Loads the curvature data for every participant in the NYU dataset,
+    for the specified hemisphere.
 
-plot_HCP_curv(subj_index=0, hemisphere='Left')
-plot_HCP_curv(subj_index=0, hemisphere='Right')
-plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Left')
-plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Right')
+    Args:
+        hemisphere (str): Which hemisphere will be plotted? 'Left' or 'Right'
+
+    Outputs:
+        subj: the list of participant IDs in the NYU dataset
+        curv: the curvature data for every NYU participant 
+    """
+    # Path to NYU participants' curvature data
+    NYU_path = osp.join(osp.dirname(osp.realpath(__file__)), '../..', 
+                    'Retinotopy/data/nyu_converted')
+
+    # Loading participant IDs:
+    with open(osp.join(NYU_path, 'nyu_list_subj')) as fp:
+        subj = fp.read().split("\n")
+    subj = subj[0:len(subj) - 1]
+
+    # Read the curvature data for each participant
+    curv = []
+    for index in range(0, len(subj)):
+        # Read the participants' data for the relevant hemisphere
+        data = nib.load(osp.join(NYU_path, f'sub-wlsubj{subj[index]}', 
+            f'sub-wlsubj{subj[index]}.curv.{hemisphere[0].lower()}h' +
+            '.32k_fs_LR.func.gii'))
+        data = torch.tensor(np.reshape(data.agg_data()
+            .reshape((NUMBER_HEMI_NODES)), (-1, 1)), dtype=torch.float)
+        # Invert curvature values to resemble format of values in HCP dataset
+        data *= -1
+        # Add the participant's data to the curvature data list
+        curv.append(data)
+    
+    return subj, curv
+
+
+def plot_NYU_curv(subj_index=0, hemisphere='Left', view_plot=True):
+    """
+    Plot the curvature map for a given participant from the NYU dataset.
+
+    Args:
+        subject_index (int): Index of participant to generate plot for.
+                             eg. if subject_index == 0, plot the curvature map
+                             for the first participant.
+        hemisphere (str): Which hemisphere will be plotted? 'Left' or 'Right'
+        view_plot (bool): If true, show the curvature plot as a HTML file
+                          in a web browser. If false, don't show the plot
+    """
+    # Get the list of participants and curvature data
+    subj, curv = read_NYU_curv(hemisphere)
+
+    # Create the background curvature map
+    background = np.array(np.reshape(curv[subj_index][0:NUMBER_HEMI_NODES], (-1)))
+
+    threshold = 1 # Threshold for the curvature map
+
+    # Remove NaNs from curvature map
+    nocurv = np.isnan(background)
+    background[nocurv == 1] = 0
+    # Background settings (discretize curvature values to give a 2 colour map)
+    background[background < 0] = 0
+    background[background > 0] = 1
+
+    # Selecting all visual areas (Wang2015) plus V1-3 fovea
+    label_primary_visual_areas = ['ROI']
+    final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
+    label_primary_visual_areas)
+    # Apply ROI mask for the relevant hemisphere
+    if hemisphere == 'Left':
+        final_mask = final_mask_L
+    else:
+        # hemisphere == 'Right'
+        final_mask = final_mask_R
+        
+    # Applying masking
+    curv_masked = np.zeros((NUMBER_HEMI_NODES, 1))
+    curv_masked[final_mask == 1] = (np.reshape(np.asarray(
+                            curv[subj_index][final_mask == 1]), (-1, 1)) + 1.5)
+    curv_masked[final_mask != 1] = 0
+
+    #### Plotting the curvature data ####
+    view = plotting.view_surf(
+        surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
+                    'Retinotopy/data/raw/surfaces',
+                    f'S1200_7T_Retinotopy181.{hemisphere[0]}' +
+                    '.sphere.32k_fs_LR.surf.gii'),
+        bg_map=background, surf_map=np.reshape(curv_masked[
+        0:NUMBER_HEMI_NODES], (-1)), threshold=threshold, cmap='plasma', 
+        black_bg=False, symmetric_cmap=False, title=f'NYU participant \
+        {subj[subj_index]}: curvature data ({hemisphere} hemisphere)')
+
+    if view_plot:
+        # View plot in web browser
+        view.open_in_browser()
+
+
+# HCP-processing curvature for first participant
+# plot_HCP_curv(subj_index=0, hemisphere='Left')
+# plot_HCP_curv(subj_index=0, hemisphere='Right')
+
+# HCP standard-processing curvature for first participant
+# plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Left')
+# plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Right')
+
+# NYU curvature for first participant
+# plot_NYU_curv(subj_index=0, hemisphere='Left')
+# plot_NYU_curv(subj_index=0, hemisphere='Right')
