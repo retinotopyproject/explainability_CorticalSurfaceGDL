@@ -12,11 +12,32 @@ from Retinotopy.functions.error_metrics import smallest_angle
 
 
 """
+This code was taken from the deepRetinotopy repository, from the file 
+'SuppFigure5a_DeltaThetaVisualCortex_PA.py' in the Manuscript/plots/left_hemi
+dir (https://github.com/Puckett-Lab/deepRetinotopy/)
+
+The code generates a mean error and individual variability map for the 
+NYU test set. This file can generate plots for both non-finetuned and
+finetuned models using the NYU dataset. Error measures the difference between
+predicted and empirical angles within each participant's data - lower error 
+values are preferred, as these may indicate a stronger similarity between
+the prediction and ground truth. Individual variability measures the 
+differences between the predicted maps across all test set participants. 
+As individual variability can indicate that the model may more successfully
+replicate the individual-specific retinotopic characteristics of a participant, 
+higher individual variability values are desired.
+
+A map of the last test set participants' curvature data will be used as a 
+background to the mean error and individual variability maps on the 
+plotted surface.
+Maps are generated per hemisphere (either Left or Right hemisphere), and can
+be generated for any PA model (models 1-5).
+
 Note: code implementation assumes that the file is being run from the dir 
-explainability_CorticalSurfaceGDL/Manuscript/plots/left_hemi - I have modified 
+explainability_CorticalSurfaceGDL/Manuscript/plots - I have modified 
 the code to automatically set the working dir to this (if it isn't already).
 """
-# Set the working directory to Manuscript/plots/left_hemi
+# Set the working directory to Manuscript/plots
 os.chdir(osp.join(osp.dirname(osp.realpath(__file__))))
 
 #### Params for selecting a model and a participant to plot ####
@@ -56,7 +77,7 @@ NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
 # Configure filepaths
 sys.path.append('../..')
 # For loading participants' curvature data
-path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 
+path = osp.join(osp.dirname(osp.realpath(__file__)), '../..', 
                 'Retinotopy/data/nyu_converted')
 
 # Loading participant IDs (in the order of selection for train/finetuning set and test set)
@@ -125,7 +146,7 @@ if num_finetuning_subjects is not None:
     testset_results_dir = 'NYU_testset_finetuned_results'
 
 # Load PA predictions and measured values
-predictions = torch.load(osp.join('./../../..', 'Models', 'generalizability', 
+predictions = torch.load(osp.join('./../..', 'Models', 'generalizability', 
     testset_results_dir, f'NYU_testset{FT_FILENAME}-intactData_PA_' + 
     f'{HEMI_FILENAME}H_model{str(selected_model)}.pt'), map_location='cpu')
 
@@ -243,7 +264,7 @@ delta_across[final_mask != 1] = 0
 
 #### Plot the error map ####
 view = plotting.view_surf(
-    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                     'Retinotopy/data/raw/surfaces',
                     f'S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
                     '.sphere.32k_fs_LR.surf.gii'),
@@ -255,7 +276,7 @@ view.open_in_browser()
 
 #### Plot the individual variability map ####
 view = plotting.view_surf(
-    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+    surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                     'Retinotopy/data/raw/surfaces',
                     f'S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
                     '.sphere.32k_fs_LR.surf.gii'),
