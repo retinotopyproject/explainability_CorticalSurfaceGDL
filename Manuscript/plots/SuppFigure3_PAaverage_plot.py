@@ -19,9 +19,9 @@ This code was taken from the deepRetinotopy repository, from the file
 (https://github.com/Puckett-Lab/deepRetinotopy/)
 
 The code generates a mean Polar Angle map of observed (ground truth) values
-for all HCP participants. This file has been modified to generate these maps 
-for HCP data pre-processed using a standard processing pipeline (different to 
-the HCP-specific processing pipeline).
+for all HCP training set participants. This file has been modified to generate 
+these maps for HCP data pre-processed using a standard processing pipeline 
+(different to the HCP-specific processing pipeline).
 A map of the first participants' curvature data will be used as a background
 to the mean PA map on the plotted surface.
 Mean PA maps are generated per hemisphere (either Left or Right hemisphere).
