@@ -19,10 +19,16 @@ This code was taken from the deepRetinotopy repository, from the file
 (https://github.com/Puckett-Lab/deepRetinotopy/)
 
 The code generates a mean Polar Angle map of observed (ground truth) values
-for all NYU participants (all participants added to a test set).
+for NYU participants added to the Training set for finetuning.
 A map of the first participants' curvature data will be used as a background
 to the mean PA map on the plotted surface.
 Mean PA maps are generated per hemisphere (either Left or Right hemisphere).
+
+For models that use NYU data but don't perform finetuning, the file 
+SuppFigure3_PAaverage_plot.py should be run instead. As no NYU participants
+are added to the training set when no finetuning occurs, the average PA
+plot for the training set would be identical to the plot for models using
+only HCP data.
 
 Note: code implementation assumes that the file is being run from the dir 
 Manuscript/plots - I have modified the code to automatically set the 
@@ -33,10 +39,21 @@ os.chdir(osp.dirname(osp.realpath(__file__)))
 
 #### Params used for model predictions ####
 # Which hemisphere will predictions be generated for? ('Left'/'Right')
-hemisphere = 'Right'
+hemisphere = 'Left'
+
+'''
+How many participants were allocated to a 'Training' set for finetuning?
+'''
+num_finetuning_subjects = 12
 
 # Create the file name components for the chosen prediction params
-HEMI_FILENAME = hemisphere[0] 
+HEMI_FILENAME = hemisphere[0]
+# Add additional info to filenames if finetuning is being used
+FT_FILENAME = ""
+if num_finetuning_subjects is not None:
+    # Add the number of subjects used to finetune and number of epochs
+    FT_FILENAME = \
+        f'_finetuned_{num_finetuning_subjects}subj'
 
 
 # The number of participants (total) in all model sets
@@ -59,7 +76,7 @@ with open(osp.join(path, '..', 'NYU_participant_IDs_in_order.txt')) as fp:
     subj = fp.read().split("\n")
 subj = subj[0:len(subj) - 1]
 '''
-Get the ID of the first participant in the NYU Test set. The curvature data 
+Get the ID of the first participant in the NYU Training set. The curvature data 
 for this participant is used as a background on the plotted surface.
 '''
 first_subj = subj[0]
@@ -92,12 +109,13 @@ background[background > 0] = 1
 # A pre-transform to be applied to the data
 pre_transform = T.Compose([T.FaceToEdge()])
 
-# Load the Test set
-test_dataset = Retinotopy(path, 'Test', transform=T.Cartesian(),
+# Load the Training set
+train_dataset = Retinotopy(path, 'Train', transform=T.Cartesian(),
                                  pre_transform=pre_transform, 
                                  n_examples=N_EXAMPLES, prediction='polarAngle', 
-                                 hemisphere=hemisphere)
-test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+                                 hemisphere=hemisphere,
+                                 num_finetuning_subjects=num_finetuning_subjects)
+train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
 # Selecting all visual areas (Wang2015) plus V1-3 fovea
 label_primary_visual_areas = ['ROI']
@@ -112,7 +130,7 @@ PolarAngle = np.zeros((NUMBER_HEMI_NODES, 1))
 
 # Load all PA maps for each Train set participant
 PA = []
-for data in test_loader:
+for data in train_loader:
     PA.append(np.array(data.y))
 # Calculate a mean map
 PA = np.mean(PA, 0)
@@ -123,7 +141,8 @@ if not osp.exists(directory):
     os.makedirs(directory)
 
 # Saving the average map
-np.savez(f'./output/NYU_AveragePolarAngleMap_{HEMI_FILENAME}H.npz', list=PA)
+np.savez(f'./output/NYU{FT_FILENAME}_AveragePolarAngleMap_{HEMI_FILENAME}H.npz', 
+            list=PA)
 
 
 #### Settings for plot ####
@@ -165,7 +184,7 @@ view = plotting.view_surf(
     surf_map=np.reshape(PolarAngle[0:NUMBER_HEMI_NODES], (-1)), 
     bg_map=background, cmap=cmap, black_bg=False, 
     symmetric_cmap=False, threshold=threshold, vmax=361,
-    title=f'NYU polar angle {hemisphere} hemisphere mean ground truth (test set)')
+    title=f'NYU finetuned - Polar angle {hemisphere} hemisphere mean ground truth (test set)')
 
 # Show in web browser
 view.open_in_browser()
