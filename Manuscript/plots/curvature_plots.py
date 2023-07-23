@@ -22,7 +22,7 @@ explainability_CorticalSurfaceGDL/Manuscript/plots - I have modified
 the code to automatically set the working dir to this (if it isn't already).
 """
 # Set the working directory to Manuscript/plots
-os.chdir(osp.join(osp.dirname(osp.realpath(__file__)), '..'))
+os.chdir(osp.join(osp.dirname(osp.realpath(__file__))))
 
 
 # Total number of cortical nodes in the mesh
@@ -52,7 +52,7 @@ def read_HCP_curv(hemisphere='Left'):
                   'cifti_curv_all.mat'
     """
     # Path to HCP participants' curvature data
-    HCP_path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 
+    HCP_path = osp.join(osp.dirname(osp.realpath(__file__)), '../..', 
                     'Retinotopy/data/raw/converted')
 
     # Load the raw curvature data
@@ -152,7 +152,7 @@ def plot_HCP_curv(subj_index=0, hemisphere='Left', view_plot=True):
 
     #### Plotting the curvature data ####
     view = plotting.view_surf(
-        surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+        surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                     'Retinotopy/data/raw/surfaces',
                     f'S1200_7T_Retinotopy181.{hemisphere[0]}' +
                     '.sphere.32k_fs_LR.surf.gii'),
@@ -185,7 +185,7 @@ def read_HCP_stdprocessing_curv(hemisphere='Left'):
     
     """
     # Path to HCP participants' curvature data
-    HCP_path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 
+    HCP_path = osp.join(osp.dirname(osp.realpath(__file__)), '../..', 
                     'Retinotopy/data/raw/converted')
 
     # Loading participant IDs:
@@ -259,7 +259,7 @@ def plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Left', view_plot=True)
 
     #### Plotting the curvature data ####
     view = plotting.view_surf(
-        surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
+        surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../..',
                         'Retinotopy/data/raw/surfaces',
                         f'S1200_7T_Retinotopy181.{hemisphere[0]}' +
                         '.sphere.32k_fs_LR.surf.gii'),
@@ -273,6 +273,7 @@ def plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Left', view_plot=True)
     if view_plot:
         # View plot in web browser
         view.open_in_browser()
+
 
 
 plot_HCP_curv(subj_index=0, hemisphere='Left')
