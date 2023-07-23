@@ -102,7 +102,7 @@ background[nocurv == 1] = 0
 background[background < 0] = 0
 background[background > 0] = 1
 
-# Sekecting all visual areas (Wang2015) plus V1-3 fovea
+# Selecting all visual areas (Wang2015) plus V1-3 fovea
 label_primary_visual_areas = ['ROI']
 final_mask_L_ROI, final_mask_R_ROI, index_L_mask, index_R_mask = roi(
     label_primary_visual_areas)
