@@ -1,184 +1,281 @@
 import os.path as osp
+import os
 import scipy.io
 import sys
-import torch_geometric.transforms as T
-import numpy as np
-
-# For reading new curvature data
-import nibabel as nib
 import torch
-
-sys.path.append('../..')
+import torch_geometric.transforms as T
+from torch_geometric.data import DataLoader
+import numpy as np
+import nibabel as nib
+from nilearn import plotting
 
 from Retinotopy.functions.def_ROIs_WangParcelsPlusFovea import roi
-from nilearn import plotting
 from Retinotopy.dataset.HCP_stdprocessing_3sets_ROI import Retinotopy
-from torch_geometric.data import DataLoader
 
 
-# Will scaling be applied to the image?
-scaling = False
+"""
+This file was used to graph 
+TODO
 
-'''
-If subject_to_plot is set to None, plots are generated for all subjects.
-Otherwise, one plot is generated for the subject at the given int index.
-'''
-subject_to_plot = 0
+Note: code implementation assumes that the file is being run from the dir 
+explainability_CorticalSurfaceGDL/Manuscript/plots - I have modified 
+the code to automatically set the working dir to this (if it isn't already).
+"""
+# Set the working directory to Manuscript/plots
+os.chdir(osp.join(osp.dirname(osp.realpath(__file__)), '..'))
 
-# Defining number of nodes
-number_cortical_nodes = int(64984)
-number_hemi_nodes = int(number_cortical_nodes / 2)
 
-# cd Manuscript/plots
-path = './../../Retinotopy/data/raw/converted'
+# Total number of cortical nodes in the mesh
+NUMBER_CORTICAL_NODES = int(64984)
+# Number of nodes within each hemisphere
+NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
 
-curv_old_raw = scipy.io.loadmat(osp.join(path, 'cifti_curv_all.mat'))['cifti_curv']
+# Configure filepaths
+sys.path.append('../..')
 
-# For new curvature data:
-# Loading subject IDs
-with open(osp.join(path, '../..', 'list_subj')) as fp:
-    subjects = fp.read().split("\n")
-subjects = subjects[0:len(subjects) - 1]
 
-# Reading all data
-curv_old = []
-curv_new = []
-for index in range(0, len(subjects)):
-    # Reading old curvature data - visual mask removed (Left hemi)
-    old_data = torch.tensor(np.reshape(
-        curv_old_raw['x' + subjects[index] + '_curvature'][0][0][
-        0:number_hemi_nodes].reshape((number_hemi_nodes)), (-1, 1)),
-        dtype=torch.float)
-    curv_old.append(old_data)
-
-    # Reading new curvature data (Left hemi)
-    new_data = nib.load(osp.join(path, f'fs-curvature/{subjects[index]}/', 
-        f'{subjects[index]}.L.curvature.32k_fs_LR.shape.gii'))
-    new_data = torch.tensor(np.reshape(new_data.agg_data()
-        .reshape((number_hemi_nodes)), (-1, 1)), dtype=torch.float)
-    curv_new.append(new_data)
-
-def plot_curvatures(subject_index, scaling):
+def read_HCP_curv(hemisphere='Left'):
     """
-    Generates curvature surf plots for the subject, with the respective
-    background mesh applied. The surf plot can be viewed in a web browser
-    and/or saved as a HTML file.
+    Loads the curvature data for every participant in the HCP dataset,
+    for the specified hemisphere.
+    The curvature data to be loaded has been processed with the HCP-specific
+    pre-processsing pipeline.
+
     Args:
-        subject_index (int): Index of participant to generate plot for
-        scaling (boolean): Will a non-linear scaling be applied to
-                            the curvature values? Used to generate a more
-                            distinct/contrasting colour scheme for the plot.
-    """
-    background_new = np.array(np.reshape(curv_new[subject_index][
-        0:number_hemi_nodes], (-1)))
-    background = np.reshape(curv_old_raw['x' + subjects[subject_index] + 
-        '_curvature'][0][0][0:number_hemi_nodes], (-1))
+        hemisphere (str): Which hemisphere will be plotted? 'Left' or 'Right'
 
-    # Background settings
-    threshold = 1
+    Outputs:
+        subj: the list of participant IDs in the HCP dataset
+        curv: the curvature data for every HCP participant (HCP-specific
+              processing pipeline)
+        curv_raw: the raw curvature data, extracted from the Matlab file
+                  'cifti_curv_all.mat'
+    """
+    # Path to HCP participants' curvature data
+    HCP_path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 
+                    'Retinotopy/data/raw/converted')
+
+    # Load the raw curvature data
+    curv_raw = scipy.io.loadmat(osp.join(HCP_path, 
+                                        'cifti_curv_all.mat'))['cifti_curv']
+
+    # Loading participant IDs:
+    with open(osp.join(HCP_path, '../..', 'list_subj')) as fp:
+        subj = fp.read().split("\n")
+    subj = subj[0:len(subj) - 1]
+
+    # Read the curvature data for each participant
+    curv = []
+    for index in range(0, len(subj)):
+        '''
+        Note: the Left hemisphere is made up of nodes with indices from the first
+        node (at index 0) up to NUMBER_HEMI_NODES - 1. 
+        The Right hemisphere contains nodes with indices from NUMBER_HEMI_NODES 
+        up to NUMBER_CORTICAL_NODES - 1.
+        '''
+        # Read the participant data with the visual mask removed
+        if hemisphere == 'Left':
+            data = torch.tensor(np.reshape(
+                curv_raw['x' + subj[index] + '_curvature'][0][0][
+                0:NUMBER_HEMI_NODES].reshape((NUMBER_HEMI_NODES)), (-1, 1)),
+                dtype=torch.float)
+        else:
+            # hemisphere == 'Right'
+            data = torch.tensor(np.reshape(
+                curv_raw['x' + subj[index] + '_curvature'][0][0][
+                NUMBER_HEMI_NODES:].reshape((NUMBER_HEMI_NODES)), (-1, 1)),
+                dtype=torch.float)
+        # Add the participant's data to the curvature data list
+        curv.append(data)
+
+    return subj, curv, curv_raw
+
+
+def plot_HCP_curv(subj_index=0, hemisphere='Left', view_plot=True):
+    """
+    Plot the curvature map for a given participant from the HCP dataset.
+    This method plots curvature values which have been processed with the
+    HCP-specific pre-processing pipeline.
+    Args:
+        subject_index (int): Index of participant to generate plot for.
+                             eg. if subject_index == 0, plot the curvature map
+                             for the first participant.
+        hemisphere (str): Which hemisphere will be plotted? 'Left' or 'Right'
+        view_plot (bool): If true, show the curvature plot as a HTML file
+                          in a web browser. If false, don't show the plot
+    """
+    # Get the list of participants, curvature data (and raw curv data)
+    subj, curv, curv_raw = read_HCP_curv(subj_index)
+
+    '''
+    Note: the Left hemisphere is made up of nodes with indices from the first
+    node (at index 0) up to NUMBER_HEMI_NODES - 1. 
+    The Right hemisphere contains nodes with indices from NUMBER_HEMI_NODES 
+    up to NUMBER_CORTICAL_NODES - 1.
+    '''
+    # Create the background curvature map
+    if hemisphere == 'Left':
+        background = np.reshape(curv_raw['x' + subj[subj_index] + 
+                                '_curvature'][0][0][0:NUMBER_HEMI_NODES], (-1))
+    else:
+        # hemisphere == 'Right'
+        background = np.reshape(curv_raw['x' + subj[subj_index] + 
+                                '_curvature'][0][0][NUMBER_HEMI_NODES:], (-1))
+    
+    threshold = 1 # Threshold for the curvature map
+
+    # Remove NaNs from curvature map
     nocurv = np.isnan(background)
     background[nocurv == 1] = 0
+    # Background settings (discretize curvature values to give a 2 colour map)
+    background[background < 0] = 0
+    background[background > 0] = 1
 
-    # New curvature background settings
-    nocurv_new = np.isnan(background_new)
-    background_new[nocurv_new == 1] = 0
-
-    # ROI settings
+    # Selecting all visual areas (Wang2015) plus V1-3 fovea
     label_primary_visual_areas = ['ROI']
     final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
     label_primary_visual_areas)
-        
-    curv_old_masked = np.zeros((number_hemi_nodes, 1))
-    curv_new_masked = np.zeros((number_hemi_nodes, 1))
-
-    # Creating loader for old curvature - left hemisphere
-    old_loader = DataLoader(curv_old, batch_size=1, shuffle=True)
-
-    # Creating loader for new curvature - left hemisphere
-    new_loader = DataLoader(curv_new, batch_size=1, shuffle=True)
-
-    if scaling:
-        '''
-        Why all of the random scaling operations on the curvature values?
-        - Adding 10 to the curvature values to ensure that they are 
-        non-negative. This prevents surf_map from changing the symmetric_cmap 
-        setting variable from False to true. The map looks funny and inaccurate
-        if it is set to symmetric.
-        - Converting every individual curvature value to 5^curvval. 
-        Basically trying to 'expand' the domain of curvature values so that 
-        there is a greater variance between the lowest values and highest 
-        values. This ensures that the value variations show up more distinctly 
-        on surf_map.
-        - Dividing curvature values by 100,000 - more of an arbitrary thing 
-        that doesn't affect the visualisation. Only done to ensure that the 
-        range of values in the colourbar appears reasonable (not in the millions)
-        The end goal of these operations is to 'expand' the values such that 
-        their coloured visualisation is easier to distinguish.
-        '''
-        # Old curvature - Masking w/ scaling applied
-        curv_old_masked[final_mask_L == 1] = np.divide(np.power(5, 
-            np.reshape(np.asarray(curv_old[subject_index][final_mask_L == 1]), 
-            (-1, 1)) + 10), 100000)
-        curv_old_masked[final_mask_L != 1] = 0
-
-        # New curvature - Masking w/ scaling applied
-        curv_new_masked[final_mask_L == 1] = np.divide(np.power(5, 
-            np.reshape(np.asarray(curv_new[subject_index][final_mask_L == 1]), 
-            (-1, 1))+ 10), 100000)
-        curv_new_masked[final_mask_L != 1] = 0
-
-        scaling_dir = 'rescaled'
+    # Apply ROI mask for the relevant hemisphere
+    if hemisphere == 'Left':
+        final_mask = final_mask_L
     else:
-        # No re-scaling applied
-        # Masking - only translating values up
-        curv_old_masked[final_mask_L == 1] = (np.reshape(np.asarray(
-            curv_old[subject_index][final_mask_L == 1]), (-1, 1)) + 1.5)
-        curv_old_masked[final_mask_L != 1] = 0
+        # hemisphere == 'Right'
+        final_mask = final_mask_R
 
-        # New curvature - Masking - only translating values up
-        curv_new_masked[final_mask_L == 1] = (np.reshape(np.asarray(
-            curv_new[subject_index][final_mask_L == 1]), (-1, 1)) + 1.5)
-        curv_new_masked[final_mask_L != 1] = 0
+    # Applying masking
+    curv_masked = np.zeros((NUMBER_HEMI_NODES, 1))
+    curv_masked[final_mask == 1] = (np.reshape(np.asarray(
+                                        curv[subj_index][final_mask == 1]), 
+                                        (-1, 1)) + 1.5)
+    curv_masked[final_mask != 1] = 0
 
-        scaling_dir = 'no_scaling'
 
-    # For old curvature
+    #### Plotting the curvature data ####
     view = plotting.view_surf(
         surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
-                    'Retinotopy/data/raw/surfaces'
-                    f'/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
-        bg_map=background, surf_map=np.reshape(curv_old_masked[
-        0:number_hemi_nodes], (-1)), threshold=threshold, cmap='plasma', 
-        black_bg=False, symmetric_cmap=False, title=f'Subject \
-        {subjects[subject_index]}: Old curvature data (Left hemisphere)')
-    # View in browser
-    view.open_in_browser()
-    # Save as html file
-    # view.save_as_html(f'D:\\Retinotopy Project\\surf_images\\\
-    #     old_vs_new_curvature\\{scaling_dir}\\\
-    #     {subjects[subject_index]}_LH_oldcurv')
+                    'Retinotopy/data/raw/surfaces',
+                    f'S1200_7T_Retinotopy181.{hemisphere[0]}' +
+                    '.sphere.32k_fs_LR.surf.gii'),
+        bg_map=background, surf_map=np.reshape(curv_masked[
+        0:NUMBER_HEMI_NODES], (-1)), threshold=threshold, cmap='plasma', 
+        black_bg=False, symmetric_cmap=False,
+        title=f'HCP participant \
+        {subj[subj_index]}: curvature data (HCP-processing pipeline, \
+        {hemisphere} hemisphere)')
+    
+    if view_plot:
+        # View plot in web browser
+        view.open_in_browser()
 
-    # For new curvature
-    view_new = plotting.view_surf(
+
+def read_HCP_stdprocessing_curv(hemisphere='Left'):
+    """
+    Loads the curvature data for every participant in the HCP dataset,
+    for the specified hemisphere.
+    The curvature data to be loaded has been processed with a more standardised
+    pre-processsing pipeline than the HCP-specific pipeline.
+
+    Args:
+        hemisphere (str): Which hemisphere will be plotted? 'Left' or 'Right'
+
+    Outputs:
+        subj: the list of participant IDs in the HCP dataset
+        curv: the curvature data for every HCP participant (standard
+              processing pipeline)
+    
+    """
+    # Path to HCP participants' curvature data
+    HCP_path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 
+                    'Retinotopy/data/raw/converted')
+
+    # Loading participant IDs:
+    with open(osp.join(HCP_path, '../..', 'list_subj')) as fp:
+        subj = fp.read().split("\n")
+    subj = subj[0:len(subj) - 1]
+
+    # Read the curvature data for each participant
+    curv = []
+    for index in range(0, len(subj)):
+        # Read the participants' data for the relevant hemisphere
+        data = nib.load(osp.join(HCP_path, f'fs-curvature/{subj[index]}/', \
+            f'{subj[index]}.{hemisphere[0]}.curvature.32k_fs_LR.shape.gii'))
+        data = torch.tensor(np.reshape(data.agg_data()
+            .reshape((NUMBER_HEMI_NODES)), (-1, 1)), dtype=torch.float)
+        # Add the participant's data to the curvature data list
+        curv.append(data)
+
+    return subj, curv
+
+
+def plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Left', view_plot=True):
+    """
+    Plot the curvature map for a given participant from the HCP dataset.
+    This method plots curvature values which have been processed with a more
+    standard pre-processing pipeline (different to the HCP-specific
+    pre-processsing pipeline).
+
+    Args:
+        subject_index (int): Index of participant to generate plot for.
+                             eg. if subject_index == 0, plot the curvature map
+                             for the first participant.
+        hemisphere (str): Which hemisphere will be plotted? 'Left' or 'Right'
+        view_plot (bool): If true, show the curvature plot as a HTML file
+                          in a web browser. If false, don't show the plot
+    """
+    # Get the list of participants and curvature data
+    subj, curv = read_HCP_stdprocessing_curv(hemisphere)
+
+    # Create the background curvature map
+    background = np.array(np.reshape(curv[subj_index][0:NUMBER_HEMI_NODES], (-1)))
+
+    threshold = 1 # Threshold for the curvature map
+
+    # Remove NaNs from curvature map
+    nocurv = np.isnan(background)
+    background[nocurv == 1] = 0
+    # Background settings (discretize curvature values to give a 2 colour map)
+    background[background < 0] = 0
+    background[background > 0] = 1
+
+    # Selecting all visual areas (Wang2015) plus V1-3 fovea
+    label_primary_visual_areas = ['ROI']
+    final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
+    label_primary_visual_areas)
+    # Apply ROI mask for the relevant hemisphere
+    if hemisphere == 'Left':
+        final_mask = final_mask_L
+    else:
+        # hemisphere == 'Right'
+        final_mask = final_mask_R
+    
+    # Applying masking
+    curv_masked = np.zeros((NUMBER_HEMI_NODES, 1))
+
+    # New curvature - Masking - only translating values up
+    curv_masked[final_mask == 1] = (np.reshape(np.asarray(
+                            curv[subj_index][final_mask == 1]), (-1, 1)) + 1.5)
+    curv_masked[final_mask != 1] = 0
+
+
+    #### Plotting the curvature data ####
+    view = plotting.view_surf(
         surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
-                        'Retinotopy/data/raw/surfaces'
-                        f'/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
-        bg_map=background_new, surf_map=np.reshape(curv_new_masked[
-        0:number_hemi_nodes], (-1)), threshold=threshold, cmap='plasma', 
-        black_bg=False, symmetric_cmap=False, title=f'Subject \
-        {subjects[subject_index]}: New curvature data (Left hemisphere)')
-    # View in browser
-    view_new.open_in_browser()
-    # Save as html file
-    # view_new.save_as_html(f'D:\\Retinotopy Project\\surf_images\\\
-    #     old_vs_new_curvature\\{scaling_dir}\\\
-    #     {subjects[subject_index]}_LH_newcurv')
+                        'Retinotopy/data/raw/surfaces',
+                        f'S1200_7T_Retinotopy181.{hemisphere[0]}' +
+                        '.sphere.32k_fs_LR.surf.gii'),
+        bg_map=background, surf_map=np.reshape(curv_masked[
+        0:NUMBER_HEMI_NODES], (-1)), threshold=threshold, cmap='plasma', 
+        black_bg=False, symmetric_cmap=False,
+        title=f'HCP participant \
+        {subj[subj_index]}: curvature data (standard-processing pipeline, \
+        {hemisphere} hemisphere)')
+
+    if view_plot:
+        # View plot in web browser
+        view.open_in_browser()
 
 
-if subject_to_plot is None:
-    # Plotting curvatures of all subjects
-    for subject_index in range(0, len(subjects)):
-        plot_curvatures(subject_index=subject_index, scaling=scaling)
-else:
-    # Plotting curvature of a single subject
-    plot_curvatures(subject_index=subject_to_plot, scaling=scaling)
+plot_HCP_curv(subj_index=0, hemisphere='Left')
+plot_HCP_curv(subj_index=0, hemisphere='Right')
+plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Left')
+plot_HCP_stdprocessing_curv(subj_index=0, hemisphere='Right')
