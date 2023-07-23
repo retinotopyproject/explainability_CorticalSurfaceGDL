@@ -1,189 +1,266 @@
+import os.path as osp
+import os
+import sys
 import numpy as np
 import scipy.io
-import os.path as osp
 import torch
-
-# For loading new curvature data
 import nibabel as nib
-
 from nilearn import plotting
+
 from Retinotopy.functions.def_ROIs_WangParcelsPlusFovea import roi
 from Retinotopy.functions.error_metrics import smallest_angle
 
-# path = './../../../Retinotopy/data/raw/converted'
-path = './../../../Retinotopy/data/nyu_converted'
-# curv = scipy.io.loadmat(osp.join(path, 'cifti_curv_all.mat'))['cifti_curv']
-# background = np.reshape(curv['x100610_curvature'][0][0][0:32492], (-1))
 
-# Loading subject IDs (in the order in which they were selected for train, dev, test datasets)
-with open(osp.join(path, '../..', 'participant_IDs_in_order.txt')) as fp:
-    subjects = fp.read().split("\n")
-subjects = subjects[0:len(subjects) - 1]
-# with open(osp.join(path, '../..', 'list_subj')) as fp:
-#     subjects = fp.read().split("\n")
-# subjects = subjects[0:len(subjects) - 1]
+"""
+Note: code implementation assumes that the file is being run from the dir 
+explainability_CorticalSurfaceGDL/Manuscript/plots/left_hemi - I have modified 
+the code to automatically set the working dir to this (if it isn't already).
+"""
+# Set the working directory to Manuscript/plots/left_hemi
+os.chdir(osp.join(osp.dirname(osp.realpath(__file__))))
 
-# Defining number of nodes
-number_cortical_nodes = int(64984)
-number_hemi_nodes = int(number_cortical_nodes / 2)
+#### Params for selecting a model and a participant to plot ####
+# Which hemisphere will predictions be graphed for? ('Left'/'Right')
+hemisphere = 'Right'
 
-curv = []
-# Index of the first subject in the testing dataset
-test_index_start = 0
-# test_index_start = 12
-for index in range(test_index_start, len(subjects)):
-    # Reading NYU curvature data (Left hemi)
-    new_data = nib.load(osp.join(path, f'sub-wlsubj{subjects[index]}', 
-        f'sub-wlsubj{subjects[index]}.curv.lh.32k_fs_LR.func.gii'))
-    new_data = torch.tensor(np.reshape(new_data.agg_data()
-        .reshape((number_hemi_nodes)), (-1, 1)), dtype=torch.float)
-    # Invert curvature values to resemble format of values in HCP dataset
-    new_data *= -1
-    curv.append(new_data)
-subject_index = 0
-background = np.array(np.reshape(curv[subject_index][0:32492], (-1)))
+'''
+How many participants were allocated to a 'Training' set for finetuning?
+If num_finetuning_subjects == None, finetuning was not performed.
+'''
+num_finetuning_subjects = None
+'''
+How many epochs did finetuning occur for? If num_finetuning_subjects == None,
+the value of num_epochs is ignored (as finetuning didn't take place).
+'''
+num_epochs = 20
+'''
+For which model (models 1-5) will predictions be plotted?
+'''
+selected_model = 5
 
-threshold = 1
+# Create the file name components for the chosen prediction params
+HEMI_FILENAME = hemisphere[0]
+# Add additional info to filenames if finetuning is being used
+FT_FILENAME = ""
+if num_finetuning_subjects is not None:
+    # Add the number of subjects used to finetune and number of epochs
+    FT_FILENAME = \
+        f'_finetuned_{num_finetuning_subjects}subj_{num_epochs}epochs'
 
+
+# Total number of cortical nodes in the mesh
+NUMBER_CORTICAL_NODES = int(64984)
+# Number of nodes within each hemisphere
+NUMBER_HEMI_NODES = int(NUMBER_CORTICAL_NODES / 2)
+
+# Configure filepaths
+sys.path.append('../..')
+# For loading participants' curvature data
+path = osp.join(osp.dirname(osp.realpath(__file__)), '../../..', 
+                'Retinotopy/data/nyu_converted')
+
+# Loading participant IDs (in the order of selection for train/finetuning set and test set)
+with open(osp.join(path, '../..', 'NYU_participant_IDs_in_order.txt')) as fp:
+    subj = fp.read().split("\n")
+subj = subj[0:len(subj) - 1]
+'''
+Get the ID of the last participant in the NYU Test set. This is the 43rd 
+participant (stored at index 42) in the list of participant IDs in order. 
+The curvature data for this participant is used as a background on the 
+plotted surface.
+'''
+last_subj = subj[-1]
+
+#### Loading curvature data for the last subject in the test set ####
+curv_data = nib.load(osp.join(path, f'sub-wlsubj{last_subj}', 
+    f'sub-wlsubj{last_subj}.curv.{HEMI_FILENAME.lower()}h.' +
+    '32k_fs_LR.func.gii'))
+curv_data = torch.tensor(np.reshape(curv_data.agg_data()
+    .reshape((NUMBER_HEMI_NODES)), (-1, 1)), dtype=torch.float)
+# Invert curvature values to resemble format of values in HCP dataset
+curv_data *= -1
+
+# Set the curvature background map
+background = np.array(np.reshape(
+                        curv_data.detach().numpy()[0:NUMBER_HEMI_NODES], (-1)))
+
+threshold = 1 # Threshold for the curvature map
+
+# Remove NaNs from curvature map
 nocurv = np.isnan(background)
 background[nocurv == 1] = 0
-
-# Predictions generated with 4 sets of features (pred = intact features)
-# models = ['pred', 'rotatedROI', 'shuffled-myelincurv', 'constant']
-num_models = 5
+# Background settings (discretize curvature values to give a 2 colour map)
+background[background < 0] = 0
+background[background > 0] = 1
 
 mean_delta = [] # Prediction error
 mean_across = [] # Individual variability
 
-num_epochs = 5
-for m in range(1, num_models+1):
-    predictions = torch.load(osp.join('./../../../Models/generalizability',
-        'NYU_testset_fineTuned_results', 
-        f'NYU_testset_fineTuned_{num_epochs}epochs_-intactData_PA_LH_model' + 
-        str(m) + '.pt'), map_location='cpu')
+# Storing theta values
+theta_withinsubj = []
+theta_acrosssubj_pred = []
 
-    theta_withinsubj = []
-    theta_acrosssubj_pred = []
-
-    label_primary_visual_areas = ['ROI']
-    final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
-        label_primary_visual_areas)
-    ROI1 = np.zeros((32492, 1))
-    ROI1[final_mask_L == 1] = 1
-
-    mask = ROI1
-    mask = mask[ROI1 == 1]
-
-    # Compute angle between predicted and empirical predictions across subj
-    for j in range(len(predictions['Predicted_values'])):
-        theta_pred_across_temp = []
-
-        for i in range(len(predictions['Predicted_values'])):
-            # Compute the difference between predicted and empirical angles
-            # within subj - error
-            if i == j:
-                # Loading predicted values
-                pred = np.reshape(np.array(predictions['Predicted_values'][i]),
-                                  (-1, 1))
-                measured = np.reshape(
-                    np.array(predictions['Measured_values'][j]),
-                    (-1, 1))
+# Selecting all visual areas (Wang2015) plus V1-3 fovea
+label_primary_visual_areas = ['ROI']
+final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
+    label_primary_visual_areas)
+ROI1 = np.zeros((NUMBER_HEMI_NODES, 1))
+# Create ROI mask for the relevant hemisphere
+if hemisphere == 'Left':
+    final_mask = final_mask_L
+else:
+    # hemisphere == 'Right'
+    final_mask = final_mask_R
+ROI1[final_mask == 1] = 1
+mask = ROI1
+mask = mask[ROI1 == 1]
 
 
-                # Rescaling polar angles to match the correct visual field (
-                # left hemisphere)
-                minus = pred > 180
-                sum = pred < 180
-                pred[minus] = pred[minus] - 180
-                pred[sum] = pred[sum] + 180
-                pred = np.array(pred) * (np.pi / 180)
+#### Loading Polar Angle data for test set participants ####
 
-                minus = measured > 180
-                sum = measured < 180
-                measured[minus] = measured[minus] - 180
-                measured[sum] = measured[sum] + 180
-                measured = np.array(measured) * (np.pi / 180)
+# Set the name of the testset results directory
+testset_results_dir = 'NYU_testset_results'
+if num_finetuning_subjects is not None:
+    # Add 'finetuned' to the testset results dir name if required
+    testset_results_dir = 'NYU_testset_finetuned_results'
 
-                # Computing delta theta, difference between predicted and
-                # empirical angles
-                theta = smallest_angle(pred, measured)
-                theta_withinsubj.append(theta)
+# Load PA predictions and measured values
+predictions = torch.load(osp.join('./../../..', 'Models', 'generalizability', 
+    testset_results_dir, f'NYU_testset{FT_FILENAME}-intactData_PA_' + 
+    f'{HEMI_FILENAME}H_model{str(selected_model)}.pt'), map_location='cpu')
 
-            if i != j:
-                # Compute the difference between predicted maps
-                # across subj - individual variability
 
-                # Loading predicted values
-                pred = np.reshape(np.array(predictions['Predicted_values'][i]),
-                                  (-1, 1))
-                pred2 = np.reshape(
-                    np.array(predictions['Predicted_values'][j]), (-1, 1))
+# Compute angle between predicted and empirical predictions across participants
+for j in range(len(predictions['Predicted_values'])):
+    theta_pred_across_temp = []
 
-                # Rescaling polar angles to match the correct visual field (
-                # left hemisphere)
-                minus = pred > 180
-                sum = pred < 180
-                pred[minus] = pred[minus] - 180
-                pred[sum] = pred[sum] + 180
-                pred = np.array(pred) * (np.pi / 180)
+    for i in range(len(predictions['Predicted_values'])):
+        '''
+        Compute the difference between predicted and empirical angles
+        within participant data (the error - ground truth vs prediction).
+        '''
+        if i == j:
+            # Loading predicted values
+            pred = np.reshape(np.array(predictions['Predicted_values'][i]),
+                                (-1, 1))
+            # Loading empirical values
+            measured = np.reshape(
+                np.array(predictions['Measured_values'][j]),
+                (-1, 1))
 
-                minus = pred2 > 180
-                sum = pred2 < 180
-                pred2[minus] = pred2[minus] - 180
-                pred2[sum] = pred2[sum] + 180
-                pred2 = np.array(pred2) * (np.pi / 180)
+            # Rescaling PA values to match the correct visual field
+            minus = pred > 180
+            sum = pred < 180
+            pred[minus] = pred[minus] - 180
+            pred[sum] = pred[sum] + 180
+            # Convert from degrees to radians
+            pred = np.array(pred) * (np.pi / 180)
 
-                # Computing delta theta, difference between predicted maps
-                theta_pred = smallest_angle(pred, pred2)
-                theta_pred_across_temp.append(theta_pred)
+            minus = measured > 180
+            sum = measured < 180
+            measured[minus] = measured[minus] - 180
+            measured[sum] = measured[sum] + 180
+            # Convert from degrees to radians
+            measured = np.array(measured) * (np.pi / 180)
 
-        theta_acrosssubj_pred.append(np.mean(theta_pred_across_temp, axis=0))
+            '''
+            Computing delta theta (the difference between the predicted and
+            empirical angles).
+            '''
+            theta = smallest_angle(pred, measured)
+            theta_withinsubj.append(theta)
 
-    mean_theta_withinsubj = np.mean(np.array(theta_withinsubj), axis=0)
-    mean_theta_acrosssubj_pred = np.mean(np.array(theta_acrosssubj_pred),
-                                         axis=0)
+        if i != j:
+            '''
+            Compute the difference between the predicted maps across all
+            test set participants (the individual variability).
+            '''
 
-    mean_delta.append(mean_theta_withinsubj[mask == 1])
-    mean_across.append(mean_theta_acrosssubj_pred[mask == 1])
+            # Loading predicted values
+            pred = np.reshape(np.array(predictions['Predicted_values'][i]),
+                                (-1, 1))
+            pred2 = np.reshape(
+                np.array(predictions['Predicted_values'][j]), (-1, 1))
 
-mean_delta = np.reshape(np.array(mean_delta), (num_models, -1))
-mean_across = np.reshape(np.array(mean_across), (num_models, -1))
+            # Rescaling PA values to match the correct visual field
+            minus = pred > 180
+            sum = pred < 180
+            pred[minus] = pred[minus] - 180
+            pred[sum] = pred[sum] + 180
+            # Convert from degrees to radians
+            pred = np.array(pred) * (np.pi / 180)
 
-# Generating plots
-# Select predictions generated with a given set of features
-# model_index = np.where(np.array(models) == 'rotatedROI')
-# Selecting predictions generated with model 5
-model_index = 4
+            minus = pred2 > 180
+            sum = pred2 < 180
+            pred2[minus] = pred2[minus] - 180
+            pred2[sum] = pred2[sum] + 180
+            # Convert from degrees to radians
+            pred2 = np.array(pred2) * (np.pi / 180)
 
-# Region of interest
-delta_theta = np.ones((32492, 1))
-delta_theta[final_mask_L == 1] = np.reshape(mean_delta[model_index],
-                                            (3267, 1)) + threshold
-delta_theta[final_mask_L != 1] = 0
+            # Computing delta theta (difference between the predicted maps)
+            theta_pred = smallest_angle(pred, pred2)
+            theta_pred_across_temp.append(theta_pred)
 
-delta_across = np.ones((32492, 1))
-delta_across[final_mask_L == 1] = np.reshape(mean_across[model_index],
-                                             (3267, 1)) + threshold
-delta_across[final_mask_L != 1] = 0
+    theta_acrosssubj_pred.append(np.mean(theta_pred_across_temp, axis=0))
 
-# Error map
+# Computing the means:
+mean_theta_withinsubj = np.mean(np.array(theta_withinsubj), axis=0)
+mean_theta_acrosssubj_pred = np.mean(np.array(theta_acrosssubj_pred),
+                                        axis=0)
+
+mean_delta.append(mean_theta_withinsubj[mask == 1])
+mean_across.append(mean_theta_acrosssubj_pred[mask == 1])
+
+mean_delta = np.reshape(np.array(mean_delta), (1, -1))
+mean_across = np.reshape(np.array(mean_across), (1, -1))
+
+'''
+Choose the model at index 0 in mean_delta and mean_across.
+In this current implementation, mean_delta and mean_across will only contain
+one model at index 0. However, the implementation can be modified to graph
+and calculate error and individual variability for multiple models at once.
+Implementation of this file in the deepRetinotopy repo added 4 different
+model types (eg. 'pred' - intact features, rotated ROI, shuffled myelin and 
+curvature values, constant values) to mean_delta and mean_across.
+A similar implementaton could also potentially be used to graph error and
+individual variability for all models 1-5 generated for the same hemisphere.
+'''
+model_index = 0
+
+# Apply masks to remove data from outside ROI
+delta_theta = np.ones((NUMBER_HEMI_NODES, 1))
+
+delta_theta[final_mask == 1] = np.reshape(mean_delta[model_index],
+                                (np.shape(mean_delta[model_index])[0], 1)) + threshold
+delta_theta[final_mask != 1] = 0
+
+delta_across = np.ones((NUMBER_HEMI_NODES, 1))
+
+delta_across[final_mask == 1] = np.reshape(mean_across[model_index],
+                                (np.shape(mean_delta[model_index])[0], 1)) + threshold
+delta_across[final_mask != 1] = 0
+
+
+#### Plot the error map ####
 view = plotting.view_surf(
     surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
-                       'Retinotopy/data/raw/surfaces'
-                       '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
-    surf_map=np.reshape(delta_theta[0:32492], (-1)), bg_map=background,
+                    'Retinotopy/data/raw/surfaces',
+                    f'S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
+                    '.sphere.32k_fs_LR.surf.gii'),
+    surf_map=np.reshape(delta_theta[0:NUMBER_HEMI_NODES], (-1)), bg_map=background,
     cmap='Reds', black_bg=False, symmetric_cmap=False, threshold=threshold,
     vmax=75 + threshold,
-    title=f'Prediction error - {num_epochs} epochs')
+    title=f'(NYU) prediction error - PA {hemisphere} hemisphere test set')
 view.open_in_browser()
 
-# Individual variability map
+#### Plot the individual variability map ####
 view = plotting.view_surf(
     surf_mesh=osp.join(osp.dirname(osp.realpath(__file__)), '../../..',
-                       'Retinotopy/data/raw/surfaces'
-                       '/S1200_7T_Retinotopy181.L.sphere.32k_fs_LR.surf.gii'),
-    surf_map=np.reshape(delta_across[0:32492], (-1)), bg_map=background,
+                    'Retinotopy/data/raw/surfaces',
+                    f'S1200_7T_Retinotopy181.{HEMI_FILENAME}' +
+                    '.sphere.32k_fs_LR.surf.gii'),
+    surf_map=np.reshape(delta_across[0:NUMBER_HEMI_NODES], (-1)), bg_map=background,
     cmap='Blues', black_bg=False, symmetric_cmap=False, threshold=threshold,
     vmax=75 + threshold,
-    title=f'Individual variability = {num_epochs} epochs')
+    title=f'(NYU) individual variability - PA {hemisphere} hemisphere test set')
 view.open_in_browser()
