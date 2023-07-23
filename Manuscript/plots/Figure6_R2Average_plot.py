@@ -31,7 +31,7 @@ os.chdir(osp.join(osp.dirname(osp.realpath(__file__))))
 
 #### Params for selecting a model to plot ####
 # Which hemisphere will predictions be graphed for? ('Left'/'Right')
-hemisphere = 'Left'
+hemisphere = 'Right'
 
 # Create the file name components for the chosen prediction params
 HEMI_FILENAME = hemisphere[0]
@@ -80,6 +80,9 @@ threshold = 1  # Threshold for the curvature map
 # Remove NaNs from curvature map
 nocurv = np.isnan(background)
 background[nocurv == 1] = 0
+# Background settings (discretize curvature values to give a 2 colour map)
+background[background < 0] = 0
+background[background > 0] = 1
 
 # Sekecting all visual areas (Wang2015) plus V1-3 fovea
 label_primary_visual_areas = ['ROI']
