@@ -2,7 +2,6 @@
 .vscode/
 Manuscript/plots/output/
 Manuscript/stats/output/
-Manuscript/testset_results/
 Models/generalizability/devset_results/
 Models/generalizability/testset_results/
 Models/generalizability/NYU_testset_results/
