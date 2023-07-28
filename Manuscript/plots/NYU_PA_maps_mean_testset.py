@@ -202,7 +202,7 @@ view = plotting.view_surf(
     threshold=threshold, vmax=361,
     title=f'(NYU) Polar angle {HEMI_FILENAME} hemisphere predictions - Model {selected_model} (test set mean)')
 view.open_in_browser()
-# view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH_mean_testset\predicted_model{selected_model}_mean')
+
 
 #### Plot the mean empirical test set data ####
 view = plotting.view_surf(
@@ -215,5 +215,4 @@ view = plotting.view_surf(
     threshold=threshold, vmax=361,
     title=f'(NYU) Polar angle {HEMI_FILENAME} hemisphere ground truth (test set mean)')
 view.open_in_browser()
-# view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH_mean_testset\empirical_model_mean')
 

@@ -188,6 +188,4 @@ view = plotting.view_surf(
 
 # Show in web browser
 view.open_in_browser()
-# Save plot as a HTML file
-# view.save_as_html(f'D:\\Retinotopy Project\\surf_images\\PA_{HEMI_FILENAME}H_mean_trainset\\NYU_empirical_mean_trainset_PA_{HEMI_FILENAME}H')
 

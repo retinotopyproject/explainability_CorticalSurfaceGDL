@@ -179,7 +179,7 @@ view = plotting.view_surf(
     threshold=threshold, vmax=361,
     title=f'Participant {participant_index+1}: Polar angle {HEMI_FILENAME} hemisphere predictions (Model {selected_model})')
 view.open_in_browser()
-# view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH\predicted_model{selected_model}_participant{participant_index+1}')
+
 
 #### Plot the empirical data ####
 view = plotting.view_surf(
@@ -192,5 +192,4 @@ view = plotting.view_surf(
     threshold=threshold, vmax=361,
     title=f'Participant {participant_index+1}: Polar angle {HEMI_FILENAME} hemisphere ground truth')
 view.open_in_browser()
-# view.save_as_html(f'D:\Retinotopy Project\surf_images\PA_LH\empirical_participant{participant_index+1}')
 

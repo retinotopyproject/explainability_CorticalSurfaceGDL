@@ -131,4 +131,3 @@ view = plotting.view_surf(
     vmax=60 + threshold,
     title=f'{hemisphere} hemisphere mean explained variance (test set)')
 view.open_in_browser()
-# view.save_as_html(f'D:\\Retinotopy Project\\surf_images\\R2_average\\R2_average_LH')
